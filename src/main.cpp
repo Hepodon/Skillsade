@@ -1,7 +1,6 @@
 #include "main.h"
 #include "lemlib/chassis/chassis.hpp"
 #include "lemlib/chassis/trackingWheel.hpp"
-#include "liblvgl/lvgl.h"
 #include "pros/abstract_motor.hpp"
 #include "pros/adi.hpp"
 #include "pros/misc.h"
@@ -60,11 +59,6 @@ lemlib::Chassis chassis(DT, lateral_controller, angular_controller, sensors);
 
 pros::Controller userInput(pros::E_CONTROLLER_MASTER);
 
-enum class autonPose { LEFT, RIGHT, SOLO };
-
-autonPose selectedAuton;
-
-float mm_In(float mm) { return mm / 25.4; }
 class score_State {
 public:
   // ** Different scoring and intake states
@@ -110,21 +104,21 @@ public:
   }
 };
 
-score_State Score_State;
+score_State balls;
 
 void scoring() {
   while (true) {
     // Scoring and intake control
     if (userInput.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
-      Score_State.store();
+      balls.store();
     } else if (userInput.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
-      Score_State.loadTop();
+      balls.loadTop();
     } else if (userInput.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN)) {
-      Score_State.loadBottom();
+      balls.loadBottom();
     } else if (userInput.get_digital(pros::E_CONTROLLER_DIGITAL_B)) {
-      Score_State.loadMiddle();
+      balls.loadMiddle();
     } else {
-      Score_State.cancel();
+      balls.cancel();
     }
 
     // Pneumatics toggle
@@ -138,33 +132,9 @@ void scoring() {
   }
 }
 
-class leftAuton {
-public:
-  leftAuton();
-
-  void alignLowerLeft() {
-    chassis.moveToPose(-3, 29, 1000, -90, {.horizontalDrift = 8, .lead = 0.3});
-    chassis.moveToPose(
-        18, 29, -90, 1500,
-        {.forwards = false, .horizontalDrift = 8, .lead = 0.2, .maxSpeed = 50});
-    chassis.setPose(0, 0, 0);
-  }
-  void matchloadLowerLeft() {
-    chassis.moveToPose(0, 24, 0, 1000);
-    // chassis.waitUntil(3);
-    // Score_State.store();
-    // pros::delay(500);
-    // chassis.moveToPoint(0, 20, 1000, {.forwards = false});
-  }
-};
-
-void leftAutonInit() { selectedAuton = autonPose::LEFT; }
-
 void initialize() {
-  chassis.calibrate(); // calibrate sensors
+  chassis.calibrate();
   chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
-  // lv_init();
-  selectedAuton = autonPose::LEFT;
 }
 
 void disabled() {}
@@ -172,9 +142,19 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
-  chassis.setPose(0, 0, 0);
+  chassis.setPose(0, 0, 90);
   match.extend();
   arm.extend();
+
+  chassis.moveToPoint(30, 5, 3000, {.maxSpeed = 100, .earlyExitRange = 3});
+  chassis.moveToPose(30, -2, 90, 10000,
+                     {.horizontalDrift = 8, .lead = .6, .maxSpeed = 90});
+  chassis.waitUntilDone();
+  balls.store();
+
+  pros::delay(800);
+
+  chassis.moveToPoint(30, 40, 1000, {.forwards = false});
 }
 
 void opcontrol() {
