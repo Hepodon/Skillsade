@@ -97,9 +97,12 @@ void setPoseFromAllSensors() {
   const double FIELD_W = 3658.0; // mm
   const double FIELD_H = 3658.0; // mm
 
-  const double SIDE_OFFSET = 90.0;
-  const double FRONT_OFFSET = 85.0;
-  const double sensorSpacing = 180.0;
+  // Distance from center of bot to sensors
+  const int SIDE_OFFSET = 90.0;
+  const int FRONT_OFFSET = 85.0;
+
+  // Distance between front and back sensors
+  const int sensorSpacing = 180.0;
 
   // Read sensors
   double lf = leftFront.get();
@@ -126,7 +129,7 @@ void setPoseFromAllSensors() {
   // Y position
   double y = FIELD_H - (f + FRONT_OFFSET);
 
-  // lemlib uses inches
+  // Convert to inches
   chassis.setPose(x / 25.4, y / 25.4, heading);
 }
 
@@ -206,8 +209,10 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
-  match.extend();
-  arm.extend();
+  while (true) {
+    setPoseFromAllSensors();
+    pros::delay(20);
+  }
 }
 
 void opcontrol() {
