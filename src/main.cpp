@@ -283,17 +283,43 @@ enum auton { Left, Right, rSolo, skills };
 
 auton selected;
 
+void rightAuton(lv_event_t *e) { selected = Right; }
+
 void initialize() {
 
   lv_init();
-////////////////////////
+  ////////////////////////
+
   lv_obj_t *autonScreen = lv_obj_create(NULL);
   lv_obj_t *trackingScreen = lv_obj_create(NULL);
   lv_obj_t *diagScreen = lv_obj_create(NULL);
   lv_obj_t *uiScreen = lv_obj_create(NULL);
 
-  
-////////////////////////
+  lv_obj_t *label = uiScreen;
+  lv_obj_t *title = uiScreen;
+
+  title = lv_label_create(uiScreen);
+  lv_label_set_text(title, "VEX VITALS");
+  lv_obj_set_style_text_font(title, &lv_font_montserrat_30, 0);
+  lv_obj_center(title);
+
+  lv_obj_t *STARTButton = lv_obj_create(uiScreen);
+
+  lv_obj_set_size(STARTButton, 200, 50);
+
+  lv_obj_align_to(STARTButton, NULL, LV_ALIGN_CENTER, 0, 100);
+
+  lv_obj_set_style_radius(STARTButton, 20, 0);
+
+  lv_obj_add_event_cb(STARTButton, rightAuton, LV_EVENT_RELEASED, NULL);
+
+  lv_obj_set_style_bg_color(STARTButton, lv_palette_main(LV_PALETTE_GREEN),
+                            LV_STATE_DEFAULT);
+
+  lv_obj_set_style_bg_color(STARTButton, lv_palette_darken(LV_PALETTE_GREEN, 3),
+                            LV_STATE_PRESSED);
+
+  ////////////////////////
   chassis.calibrate();
   chassis.setBrakeMode(E_MOTOR_BRAKE_HOLD);
   Task averagingTask(avgIMU);
