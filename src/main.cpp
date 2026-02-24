@@ -55,7 +55,8 @@ RclSensor RB(&rightBack, 0, 20, 0, 1);
 
 Rotation vertRotation(-5);
 
-Optical colorSensor();
+Optical colorSensorMatch();
+Optical colorSensorScore();
 
 lemlib::Drivetrain DT(&aleft, &aright, 12.72, lemlib::Omniwheel::NEW_325, 450,
                       8);
@@ -149,6 +150,9 @@ void setPoseFromAllSensors() {
   chassis.setPose(x / 25.4, y / 25.4, heading);
 }
 
+enum teamColor { red, blue };
+enum where { top, middle, middleSlow };
+
 class score_State {
 
 public:
@@ -194,6 +198,52 @@ public:
     sorter.move(0);
     intake.move(0);
   }
+
+  void intakeUntilOppCol(teamColor color, int timeout) {
+    store();
+    int time = 0;
+    if (color == red) {
+      while ((colorSensorMatch().get_hue() <= 15 ||
+              colorSensorMatch().get_hue() >= 345) &&
+             time < timeout) {
+        delay(10);
+        time += 10;
+      }
+    } else {
+      while ((colorSensorMatch().get_hue() <= 240 ||
+              colorSensorMatch().get_hue() >= 200) &&
+             time < timeout) {
+        delay(10);
+        time += 10;
+      }
+    }
+  }
+
+  void scoreUntilOppCol(teamColor color, int timeout, where where = top) {
+    if (where == top) {
+      loadTop();
+    } else if (where == middle) {
+      loadMiddle();
+    } else {
+      loadMiddleSLOW();
+    }
+    int time = 0;
+    if (color == red) {
+      while ((colorSensorMatch().get_hue() <= 15 ||
+              colorSensorMatch().get_hue() >= 345) &&
+             time < timeout) {
+        delay(10);
+        time += 10;
+      }
+    } else {
+      while ((colorSensorMatch().get_hue() <= 240 ||
+              colorSensorMatch().get_hue() >= 200) &&
+             time < timeout) {
+        delay(10);
+        time += 10;
+      }
+    }
+  }
 };
 
 score_State balls;
@@ -230,17 +280,20 @@ void diagnosticsUpdater() {
 }
 
 enum auton { Left, Right, rSolo, skills };
+
 auton selected;
 
 void initialize() {
-  lv_init();
 
+  lv_init();
+////////////////////////
   lv_obj_t *autonScreen = lv_obj_create(NULL);
   lv_obj_t *trackingScreen = lv_obj_create(NULL);
   lv_obj_t *diagScreen = lv_obj_create(NULL);
   lv_obj_t *uiScreen = lv_obj_create(NULL);
 
-  rcl.startTracking();
+  
+////////////////////////
   chassis.calibrate();
   chassis.setBrakeMode(E_MOTOR_BRAKE_HOLD);
   Task averagingTask(avgIMU);
@@ -252,6 +305,10 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
+  rcl.startTracking();
+  colorSensorMatch().set_led_pwm(100);
+  colorSensorScore().set_led_pwm(100);
+
   switch (selected) {
   case Left:
     break;
