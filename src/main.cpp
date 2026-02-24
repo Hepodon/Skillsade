@@ -1,19 +1,18 @@
 #include "main.h"
+#include "RclTracking.hpp"
 #include "lemlib/chassis/chassis.hpp"
 #include "lemlib/chassis/trackingWheel.hpp"
 #include "liblvgl/core/lv_obj.h"
-#include "liblvgl/core/lv_obj_pos.h"
-#include "liblvgl/core/lv_obj_scroll.h"
-#include "liblvgl/core/lv_obj_style.h"
 #include "liblvgl/display/lv_display.h"
-#include "liblvgl/misc/lv_area.h"
-#include "liblvgl/misc/lv_color.h"
+#include "liblvgl/misc/lv_types.h"
 #include "pros/abstract_motor.hpp"
+#include "pros/adi.h"
 #include "pros/adi.hpp"
 #include "pros/distance.hpp"
 #include "pros/misc.h"
 #include "pros/motor_group.hpp"
 #include "pros/motors.h"
+#include "pros/motors.hpp"
 #include "pros/optical.hpp"
 #include <cmath>
 #include <cstdio>
@@ -21,13 +20,22 @@
 using namespace pros;
 using namespace std;
 
-MotorGroup aleft({-8, -7, 19}, pros::MotorGearset::blue,
-                 pros::v5::MotorUnits::degrees);
-MotorGroup aright({9, 17, -3}, pros::MotorGearset::blue,
-                  pros::v5::MotorUnits::degrees);
-Motor intake(18);
-Motor topOut(6);
-Motor sorter(12);
+float motorPorts[9][3] = {{-8, 0, 0}, {7, 0, 0},   {-19, 0, 0},
+                          {9, 0, 0},  {-17, 0, 0}, {3, 0, 0},
+                          {18, 0, 0}, {12, 0, 0},  {6, 0, 0}};
+
+MotorGroup aleft({static_cast<signed char>(motorPorts[0][0]),
+                  static_cast<signed char>(motorPorts[1][0]),
+                  static_cast<signed char>(motorPorts[2][0])},
+                 MotorGearset::blue, v5::MotorUnits::degrees);
+MotorGroup aright({static_cast<signed char>(motorPorts[3][0]),
+                   static_cast<signed char>(motorPorts[4][0]),
+                   static_cast<signed char>(motorPorts[5][0])},
+                  MotorGearset::blue, v5::MotorUnits::degrees);
+
+Motor intake(static_cast<signed char>(motorPorts[6][0]));
+Motor topOut(static_cast<signed char>(motorPorts[7][0]));
+Motor sorter(static_cast<signed char>(motorPorts[8][0]));
 
 adi::Pneumatics match('a', false);
 adi::Pneumatics arm('h', false);
@@ -38,6 +46,12 @@ Distance leftFront(0);
 Distance leftBack(0);
 Distance front(0);
 Distance matchDist(0);
+
+RclSensor F(&front, 0, 20, 0, 1);
+RclSensor LB(&leftBack, 0, 20, 0, 1);
+RclSensor LF(&leftFront, 0, 20, 0, 1);
+RclSensor RF(&rightFront, 0, 20, 0, 1);
+RclSensor RB(&rightBack, 0, 20, 0, 1);
 
 Rotation vertRotation(-5);
 
@@ -81,13 +95,15 @@ lemlib::ControllerSettings
 
 lemlib::Chassis chassis(DT, lateral_controller, angular_controller, sensors);
 
-pros::Controller userInput(pros::E_CONTROLLER_MASTER);
+RclTracking rcl(&chassis);
+
+Controller userInput(E_CONTROLLER_MASTER);
 
 void avgIMU() {
   while (true) {
     inertial1.set_heading((inertial1.get_heading() + inertial2.get_heading()) /
                           2);
-    pros::delay(5);
+    delay(5);
   }
 }
 
@@ -134,6 +150,7 @@ void setPoseFromAllSensors() {
 }
 
 class score_State {
+
 public:
   // Different scoring and intake states
   score_State() {};
@@ -172,7 +189,11 @@ public:
     intake.move(127);
   }
   // Stop motors
-  void cancel() {}
+  void cancel() {
+    topOut.move(0);
+    sorter.move(0);
+    intake.move(0);
+  }
 };
 
 score_State balls;
@@ -188,20 +209,42 @@ void scoring() {
       balls.loadMiddle();
     } else if (userInput.get_digital(DIGITAL_A)) {
       balls.loadBottom();
+    } else if (userInput.get_digital(DIGITAL_X)) {
+      balls.loadMiddleSLOW();
+    } else {
+      balls.cancel();
     }
-    pros::delay(20);
+    delay(20);
   }
 }
 
 void screenInit() {}
 
+void diagnosticsUpdater() {
+  while (true) {
+    for (int i = 0; i < 9; i++) {
+      motorPorts[i][1] = Motor(i).get_temperature();
+      motorPorts[i][2] = Motor(i).get_position();
+    }
+  }
+}
+
+enum auton { Left, Right, rSolo, skills };
+auton selected;
+
 void initialize() {
   lv_init();
+
+  lv_obj_t *autonScreen = lv_obj_create(NULL);
+  lv_obj_t *trackingScreen = lv_obj_create(NULL);
+  lv_obj_t *diagScreen = lv_obj_create(NULL);
+  lv_obj_t *uiScreen = lv_obj_create(NULL);
+
+  rcl.startTracking();
   chassis.calibrate();
-  setPoseFromAllSensors();
-  chassis.setBrakeMode(pros::E_MOTOR_BRAKE_HOLD);
-  pros::Task averagingTask(avgIMU);
-  screenInit();
+  chassis.setBrakeMode(E_MOTOR_BRAKE_HOLD);
+  Task averagingTask(avgIMU);
+  lv_screen_load(uiScreen);
 }
 
 void disabled() {}
@@ -209,23 +252,29 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
-  while (true) {
-    setPoseFromAllSensors();
-    pros::delay(20);
+  switch (selected) {
+  case Left:
+    break;
+  case Right:
+    break;
+  case rSolo:
+    break;
+  case skills:
+    break;
   }
 }
 
 void opcontrol() {
   // Ball management task
-  pros::Task scoreTask(scoring);
+  Task scoreTask(scoring);
   while (true) {
     // Collect and store controller input
-    int leftY = userInput.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
-    int rightX = userInput.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
+    int leftY = userInput.get_analog(E_CONTROLLER_ANALOG_LEFT_Y);
+    int rightX = userInput.get_analog(E_CONTROLLER_ANALOG_RIGHT_X);
 
     // Apply controller input for movement using split arcade controls
     chassis.arcade(leftY, rightX, true, 0.40);
 
-    pros::delay(10);
+    delay(10);
   }
 }
