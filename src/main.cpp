@@ -47,12 +47,6 @@ Distance leftBack(0);
 Distance front(0);
 Distance matchDist(0);
 
-RclSensor F(&front, 0, 20, 0, 1);
-RclSensor LB(&leftBack, 0, 20, 0, 1);
-RclSensor LF(&leftFront, 0, 20, 0, 1);
-RclSensor RF(&rightFront, 0, 20, 0, 1);
-RclSensor RB(&rightBack, 0, 20, 0, 1);
-
 Rotation vertRotation(-5);
 
 Optical colorSensorMatch();
@@ -299,7 +293,7 @@ void initialize() {
   lv_obj_t *title = uiScreen;
 
   title = lv_label_create(uiScreen);
-  lv_label_set_text(title, "VEX VITALS");
+  lv_label_set_text(title, "VEX RIGHT AUTON");
   lv_obj_set_style_text_font(title, &lv_font_montserrat_30, 0);
   lv_obj_center(title);
 
@@ -330,8 +324,11 @@ void disabled() {}
 
 void competition_initialize() {}
 
+RclSensor F(&front, 0, 20, 0, 1);
+RclSensor LF(&leftFront, 0, 20, 0, 1);
+RclSensor RF(&rightFront, 0, 20, 0, 1);
+
 void autonomous() {
-  rcl.startTracking();
   colorSensorMatch().set_led_pwm(100);
   colorSensorScore().set_led_pwm(100);
 
@@ -339,6 +336,11 @@ void autonomous() {
   case Left:
     break;
   case Right:
+    rcl.startTracking();
+
+    balls.intakeUntilOppCol(red, 5000);
+    balls.cancel();
+
     break;
   case rSolo:
     break;
