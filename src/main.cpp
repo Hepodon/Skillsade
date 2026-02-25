@@ -6,7 +6,6 @@
 #include "liblvgl/display/lv_display.h"
 #include "liblvgl/misc/lv_types.h"
 #include "pros/abstract_motor.hpp"
-#include "pros/adi.h"
 #include "pros/adi.hpp"
 #include "pros/distance.hpp"
 #include "pros/misc.h"
@@ -242,84 +241,84 @@ public:
 
 score_State balls;
 
-bool in = false;
-bool top = false;
-bool mid = false;
-bool bottom = false;
+bool inScore = false;
+bool topScore = false;
+bool midScore = false;
+bool bottomScore = false;
 
 void scoring() {
   while (true) {
 
     if (userInput.get_digital(DIGITAL_R2)) {
-      if (!in) {
-        in = true;
-        top = false;
-        mid = false;
-        bottom = false;
+      if (!inScore) {
+        inScore = true;
+        topScore = false;
+        midScore = false;
+        bottomScore = false;
         balls.store();
       } else {
         balls.cancel();
-        in = false;
-        top = false;
-        mid = false;
-        bottom = false;
+        inScore = false;
+        topScore = false;
+        midScore = false;
+        bottomScore = false;
       }
     } else if (userInput.get_digital(DIGITAL_R1)) {
-      if (!top) {
-        in = false;
-        top = true;
-        mid = false;
-        bottom = false;
+      if (!topScore) {
+        inScore = false;
+        topScore = true;
+        midScore = false;
+        bottomScore = false;
         balls.loadTop();
       } else {
         balls.cancel();
-        in = false;
-        top = false;
-        mid = false;
-        bottom = false;
+        inScore = false;
+        topScore = false;
+        midScore = false;
+        bottomScore = false;
       }
     } else if (userInput.get_digital(DIGITAL_B)) {
-      if (!middle) {
-        in = false;
-        top = false;
-        mid = true;
-        bottom = false;
+      if (!midScore) {
+        inScore = false;
+        topScore = false;
+        midScore = true;
+        bottomScore = false;
         balls.loadMiddle();
       } else {
         balls.cancel();
-        in = false;
-        top = false;
-        mid = false;
-        bottom = false;
+        inScore = false;
+        topScore = false;
+        midScore = false;
+        bottomScore = false;
       }
     } else if (userInput.get_digital(DIGITAL_A)) {
-      if (!bottom) {
-        in = false;
-        top = false;
-        middle = false;
-        bottom = true;
+      if (!bottomScore) {
+        inScore = false;
+        topScore = false;
+        midScore = false;
+        bottomScore = true;
         balls.loadBottom();
       } else {
         balls.cancel();
-        in = false;
-        top = false;
-        mid = false;
-        d bottom = false;
+        inScore = false;
+        topScore = false;
+        midScore = false;
+        bottomScore = false;
       }
       balls.loadBottom();
     } else if (userInput.get_digital(DIGITAL_X)) {
-      if (!middle) {
-        in = false;
-        top = false;
-        mid = true;
-        bottom = false;
+      if (!midScore) {
+        inScore = false;
+        topScore = false;
+        midScore = true;
+        bottomScore = false;
         balls.loadMiddleSLOW();
       } else {
         balls.cancel();
-        in = false;
-        top = false;
-        mid = false;
-        bottom = false;
+        inScore = false;
+        topScore = false;
+        midScore = false;
+        bottomScore = false;
       }
     }
     delay(20);
