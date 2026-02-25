@@ -3,7 +3,9 @@
 #include "lemlib/chassis/chassis.hpp"
 #include "lemlib/chassis/trackingWheel.hpp"
 #include "liblvgl/core/lv_obj.h"
+#include "liblvgl/core/lv_obj_scroll.h"
 #include "liblvgl/display/lv_display.h"
+#include "liblvgl/misc/lv_area.h"
 #include "liblvgl/misc/lv_types.h"
 #include "pros/abstract_motor.hpp"
 #include "pros/adi.hpp"
@@ -45,6 +47,10 @@ Distance leftFront(0);
 Distance leftBack(0);
 Distance front(0);
 Distance matchDist(0);
+
+RclSensor F(&front, 0, 20, 0, 1);
+RclSensor LF(&leftFront, 0, 20, 0, 1);
+RclSensor RF(&rightFront, 0, 20, 0, 1);
 
 Rotation vertRotation(-5);
 
@@ -340,44 +346,76 @@ enum auton { Left, Right, rSolo, skills };
 
 auton selected;
 
-void rightAuton(lv_event_t *e) { selected = Right; }
+void rightAuton(lv_event_t *e) {
+  selected = Right;
+  lv_obj_clean(lv_screen_active());
+}
+
+void createLvglButton(lv_obj_t *obj, const char *text, lv_event_cb_t event_cb,
+                      int width, int height, lv_align_t align, int x_ofs,
+                      int y_ofs, lv_palette_t color = LV_PALETTE_BLUE) {
+  lv_obj_t *button = lv_obj_create(obj);
+  lv_obj_set_size(button, width, height);
+  lv_obj_align_to(button, NULL, align, x_ofs, y_ofs);
+  lv_obj_set_style_radius(button, 20, 0);
+  lv_obj_set_style_bg_color(button, lv_palette_main(color), LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_color(button, lv_palette_darken(color, 3),
+                            LV_STATE_PRESSED);
+
+  lv_obj_t *label = lv_label_create(button);
+  lv_label_set_text(label, text);
+  lv_obj_center(label);
+
+  lv_obj_add_event_cb(button, event_cb, LV_EVENT_RELEASED, NULL);
+
+  lv_obj_set_scrollbar_mode(button, LV_SCROLLBAR_MODE_OFF);
+}
 
 void initialize() {
 
   lv_init();
-  ////////////////////////
+  ///////////////////////
 
   lv_obj_t *autonScreen = lv_obj_create(NULL);
   lv_obj_t *trackingScreen = lv_obj_create(NULL);
   lv_obj_t *diagScreen = lv_obj_create(NULL);
   lv_obj_t *uiScreen = lv_obj_create(NULL);
 
-  lv_obj_t *label = uiScreen;
-  lv_obj_t *title = uiScreen;
+  lv_obj_set_scrollbar_mode(uiScreen, LV_SCROLLBAR_MODE_OFF);
 
-  title = lv_label_create(uiScreen);
-  lv_label_set_text(title, "VEX RIGHT AUTON");
-  lv_obj_set_style_text_font(title, &lv_font_montserrat_30, 0);
-  lv_obj_center(title);
+  lv_obj_t *a = uiScreen;
 
-  lv_obj_t *STARTButton = lv_obj_create(uiScreen);
+  // lv_obj_t *label = uiScreen;
+  // lv_obj_t *title = uiScreen;
 
-  lv_obj_set_size(STARTButton, 200, 50);
+  // title = lv_label_create(uiScreen);
+  // lv_label_set_text(title, "VEX RIGHT AUTON");
+  // lv_obj_set_style_text_font(title, &lv_font_montserrat_30, 0);
+  // lv_obj_center(title);
 
-  lv_obj_align_to(STARTButton, NULL, LV_ALIGN_CENTER, 0, 100);
+  // lv_obj_t *STARTButton = lv_obj_create(uiScreen);
 
-  lv_obj_set_style_radius(STARTButton, 20, 0);
+  // lv_obj_set_size(STARTButton, 200, 50);
 
-  lv_obj_add_event_cb(STARTButton, rightAuton, LV_EVENT_RELEASED, NULL);
+  // lv_obj_align_to(STARTButton, NULL, LV_ALIGN_CENTER, 0, 100);
 
-  lv_obj_set_style_bg_color(STARTButton, lv_palette_main(LV_PALETTE_GREEN),
-                            LV_STATE_DEFAULT);
+  // lv_obj_set_style_radius(STARTButton, 20, 0);
 
-  lv_obj_set_style_bg_color(STARTButton, lv_palette_darken(LV_PALETTE_GREEN, 3),
-                            LV_STATE_PRESSED);
+  // lv_obj_add_event_cb(STARTButton, rightAuton, LV_EVENT_RELEASED, NULL);
+
+  // lv_obj_set_style_bg_color(STARTButton, lv_palette_main(LV_PALETTE_GREEN),
+  //                           LV_STATE_DEFAULT);
+
+  // lv_obj_set_style_bg_color(STARTButton, lv_palette_darken(LV_PALETTE_GREEN,
+  // 3),
+  //                           LV_STATE_PRESSED);
+
+  createLvglButton(a, "TEST", rightAuton, 20, 50, LV_ALIGN_CENTER, -20, 20,
+                   LV_PALETTE_RED);
 
   ////////////////////////
   chassis.calibrate();
+  rcl.startTracking();
   chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
   Task averagingTask(avgIMU);
   lv_screen_load(uiScreen);
@@ -387,10 +425,6 @@ void disabled() {}
 
 void competition_initialize() {}
 
-RclSensor F(&front, 0, 20, 0, 1);
-RclSensor LF(&leftFront, 0, 20, 0, 1);
-RclSensor RF(&rightFront, 0, 20, 0, 1);
-
 void autonomous() {
   colorSensorMatch.set_led_pwm(100);
   colorSensorScore.set_led_pwm(100);
@@ -399,7 +433,6 @@ void autonomous() {
   case Left:
     break;
   case Right:
-    rcl.startTracking();
 
     balls.intakeUntilOppCol(red, 5000);
     balls.cancel();
