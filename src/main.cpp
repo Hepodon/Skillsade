@@ -1,9 +1,24 @@
 #include "main.h"
+#include "RclTracking.hpp"
 #include "lemlib/chassis/chassis.hpp"
 #include "lemlib/chassis/trackingWheel.hpp"
+#include "liblvgl/core/lv_obj.h"
+#include "liblvgl/core/lv_obj_pos.h"
+#include "liblvgl/core/lv_obj_scroll.h"
+#include "liblvgl/core/lv_obj_tree.h"
+#include "liblvgl/display/lv_display.h"
+#include "liblvgl/misc/lv_area.h"
+#include "liblvgl/misc/lv_types.h"
+#include "pros/abstract_motor.hpp"
 #include "pros/adi.hpp"
+#include "pros/distance.hpp"
 #include "pros/misc.h"
-
+#include "pros/motor_group.hpp"
+#include "pros/motors.h"
+#include "pros/motors.hpp"
+#include "pros/optical.hpp"
+#include <cmath>
+#include <cstdio>
 using namespace pros;
 
 MotorGroup aleft({-10, -9, -8});
