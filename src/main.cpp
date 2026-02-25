@@ -14,7 +14,7 @@ MotorGroup middle({7, -4});
 adi::Pneumatics match('a', false);
 adi::Pneumatics arm('h', false);
 adi::Pneumatics tripstate('e', false);
-adi::Pneumatics tripstate2('f', false);
+adi::Pneumatics tripstate2('b', false);
 
 Rotation vertRot(5);
 
@@ -28,13 +28,13 @@ lemlib::OdomSensors sensors(&vert, nullptr, nullptr, nullptr, &imu);
 
 // lateral PID controller
 lemlib::ControllerSettings
-    lateral_controller(5,  // proportional gain (kP)
+    lateral_controller(5,   // proportional gain (kP)
                        0,   // integral gain (kI)
-                       5.5,   // derivative gain (kD)
+                       5.5, // derivative gain (kD)
                        3,   // anti windup
-                       0.5,   // small error range, in inches
+                       0.5, // small error range, in inches
                        100, // small error range timeout, in milliseconds
-                       1.5,   // large error range, in inches
+                       1.5, // large error range, in inches
                        200, // large error range timeout, in milliseconds
                        20   // maximum acceleration (slew)
     );
@@ -140,7 +140,7 @@ void outtake() {
 }
 
 void autonomous() {
-  chassis.moveToPoint(0,48, 10000);
+  chassis.moveToPoint(0, 48, 10000);
   chassis.waitUntilDone();
   middle.move(50);
 }
@@ -166,6 +166,10 @@ void opcontrol() {
       scoreMid();
     } else if (userInput.get_digital(DIGITAL_B)) {
       outtake();
+    } else if (userInput.get_digital_new_press(DIGITAL_DOWN)) {
+      tripstate.toggle();
+    } else if (userInput.get_digital_new_press(DIGITAL_UP)) {
+      tripstate2.toggle();
     }
 
     delay(5);
