@@ -3,7 +3,9 @@
 #include "lemlib/chassis/chassis.hpp"
 #include "lemlib/chassis/trackingWheel.hpp"
 #include "liblvgl/core/lv_obj.h"
+#include "liblvgl/core/lv_obj_pos.h"
 #include "liblvgl/core/lv_obj_scroll.h"
+#include "liblvgl/core/lv_obj_tree.h"
 #include "liblvgl/display/lv_display.h"
 #include "liblvgl/misc/lv_area.h"
 #include "liblvgl/misc/lv_types.h"
@@ -255,7 +257,7 @@ bool bottomScore = false;
 void scoring() {
   while (true) {
 
-    if (userInput.get_digital(DIGITAL_R2)) {
+    if (userInput.get_digital_new_press(DIGITAL_R2)) {
       if (!inScore) {
         inScore = true;
         topScore = false;
@@ -269,7 +271,7 @@ void scoring() {
         midScore = false;
         bottomScore = false;
       }
-    } else if (userInput.get_digital(DIGITAL_R1)) {
+    } else if (userInput.get_digital_new_press(DIGITAL_R1)) {
       if (!topScore) {
         inScore = false;
         topScore = true;
@@ -283,7 +285,7 @@ void scoring() {
         midScore = false;
         bottomScore = false;
       }
-    } else if (userInput.get_digital(DIGITAL_B)) {
+    } else if (userInput.get_digital_new_press(DIGITAL_B)) {
       if (!midScore) {
         inScore = false;
         topScore = false;
@@ -297,7 +299,7 @@ void scoring() {
         midScore = false;
         bottomScore = false;
       }
-    } else if (userInput.get_digital(DIGITAL_A)) {
+    } else if (userInput.get_digital_new_press(DIGITAL_A)) {
       if (!bottomScore) {
         inScore = false;
         topScore = false;
@@ -311,8 +313,7 @@ void scoring() {
         midScore = false;
         bottomScore = false;
       }
-      balls.loadBottom();
-    } else if (userInput.get_digital(DIGITAL_X)) {
+    } else if (userInput.get_digital_new_press(DIGITAL_X)) {
       if (!midScore) {
         inScore = false;
         topScore = false;
@@ -374,6 +375,8 @@ void createLvglButton(lv_obj_t *obj, const char *text, lv_event_cb_t event_cb,
 void initialize() {
 
   lv_init();
+
+  lv_obj_clean(lv_screen_active());
   ///////////////////////
 
   lv_obj_t *autonScreen = lv_obj_create(NULL);
@@ -382,43 +385,21 @@ void initialize() {
   lv_obj_t *uiScreen = lv_obj_create(NULL);
 
   lv_obj_set_scrollbar_mode(uiScreen, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_set_scrollbar_mode(autonScreen, LV_SCROLLBAR_MODE_OFF);
 
-  lv_obj_t *a = uiScreen;
+  lv_obj_align_to(autonScreen, lv_screen_active(), LV_ALIGN_CENTER, 0, 0);
 
-  // lv_obj_t *label = uiScreen;
-  // lv_obj_t *title = uiScreen;
+  lv_obj_t *rightButton = lv_obj_create(autonScreen);
 
-  // title = lv_label_create(uiScreen);
-  // lv_label_set_text(title, "VEX RIGHT AUTON");
-  // lv_obj_set_style_text_font(title, &lv_font_montserrat_30, 0);
-  // lv_obj_center(title);
-
-  // lv_obj_t *STARTButton = lv_obj_create(uiScreen);
-
-  // lv_obj_set_size(STARTButton, 200, 50);
-
-  // lv_obj_align_to(STARTButton, NULL, LV_ALIGN_CENTER, 0, 100);
-
-  // lv_obj_set_style_radius(STARTButton, 20, 0);
-
-  // lv_obj_add_event_cb(STARTButton, rightAuton, LV_EVENT_RELEASED, NULL);
-
-  // lv_obj_set_style_bg_color(STARTButton, lv_palette_main(LV_PALETTE_GREEN),
-  //                           LV_STATE_DEFAULT);
-
-  // lv_obj_set_style_bg_color(STARTButton, lv_palette_darken(LV_PALETTE_GREEN,
-  // 3),
-  //                           LV_STATE_PRESSED);
-
-  createLvglButton(a, "TEST", rightAuton, 20, 50, LV_ALIGN_CENTER, -20, 20,
-                   LV_PALETTE_RED);
+  createLvglButton(rightButton, "TEST", rightAuton, 100, 50, LV_ALIGN_CENTER,
+                   -20, 20, LV_PALETTE_RED);
 
   ////////////////////////
   chassis.calibrate();
   rcl.startTracking();
   chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
   Task averagingTask(avgIMU);
-  lv_screen_load(uiScreen);
+  lv_screen_load(autonScreen);
 }
 
 void disabled() {}
