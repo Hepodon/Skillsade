@@ -376,7 +376,6 @@ void createLvglButton(lv_obj_t *obj, const char *text, lv_event_cb_t event_cb,
 
   // lv_obj_set_style_bg_opa(button, LV_OPA_TRANSP, 0);
   // lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, 0);
-
 }
 
 void initialize() {
@@ -396,13 +395,11 @@ void initialize() {
   lv_obj_set_scrollbar_mode(diagScreen, LV_SCROLLBAR_MODE_OFF);
   lv_obj_set_scrollbar_mode(trackingScreen, LV_SCROLLBAR_MODE_OFF);
 
-
   lv_obj_t *rightButton = lv_obj_create(autonScreen);
 
   lv_obj_set_size(autonScreen, 480, 272);
-  
-  lv_obj_set_style_bg_opa(rightButton, LV_OPA_TRANSP, 0);
 
+  lv_obj_set_style_bg_opa(rightButton, LV_OPA_TRANSP, 0);
 
   lv_obj_align_to(rightButton, autonScreen, LV_ALIGN_CENTER, 0, 0);
 
