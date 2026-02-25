@@ -397,7 +397,7 @@ void initialize() {
 
   lv_obj_t *rightButton = lv_obj_create(autonScreen);
 
-  lv_obj_set_size(autonScreen, 480, 272);
+  // lv_obj_set_size(autonScreen, 480, 272);
 
   lv_obj_set_style_bg_opa(rightButton, LV_OPA_TRANSP, 0);
 
