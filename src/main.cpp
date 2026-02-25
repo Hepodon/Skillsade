@@ -129,7 +129,7 @@ void outtake() {
     middle.move(-127);
   }
   middle.brake();
-  
+
   out = false;
   top = false;
   mid = false;
