@@ -20,9 +20,9 @@
 using namespace pros;
 using namespace std;
 
-float motorPorts[9][3] = {{-8, 0, 0}, {7, 0, 0},   {-19, 0, 0},
-                          {9, 0, 0},  {-17, 0, 0}, {3, 0, 0},
-                          {18, 0, 0}, {12, 0, 0},  {6, 0, 0}};
+float motorPorts[9][3] = {{-8, 0, 0}, {-7, 0, 0}, {-19, 0, 0},
+                          {9, 0, 0},  {17, 0, 0}, {3, 0, 0},
+                          {11, 0, 0}, {12, 0, 0}, {6, 0, 0}};
 
 MotorGroup aleft({static_cast<signed char>(motorPorts[0][0]),
                   static_cast<signed char>(motorPorts[1][0]),
@@ -49,8 +49,8 @@ Distance matchDist(0);
 
 Rotation vertRotation(-5);
 
-Optical colorSensorMatch();
-Optical colorSensorScore();
+v5::Optical colorSensorMatch(0);
+v5::Optical colorSensorScore(0);
 
 lemlib::Drivetrain DT(&aleft, &aright, 12.72, lemlib::Omniwheel::NEW_325, 450,
                       8);
@@ -197,15 +197,15 @@ public:
     store();
     int time = 0;
     if (color == red) {
-      while ((colorSensorMatch().get_hue() <= 15 ||
-              colorSensorMatch().get_hue() >= 345) &&
+      while ((colorSensorMatch.get_hue() <= 15 ||
+              colorSensorMatch.get_hue() >= 345) &&
              time < timeout) {
         delay(10);
         time += 10;
       }
     } else {
-      while ((colorSensorMatch().get_hue() <= 240 ||
-              colorSensorMatch().get_hue() >= 200) &&
+      while ((colorSensorMatch.get_hue() <= 240 ||
+              colorSensorMatch.get_hue() >= 200) &&
              time < timeout) {
         delay(10);
         time += 10;
@@ -223,15 +223,15 @@ public:
     }
     int time = 0;
     if (color == red) {
-      while ((colorSensorMatch().get_hue() <= 15 ||
-              colorSensorMatch().get_hue() >= 345) &&
+      while ((colorSensorMatch.get_hue() <= 15 ||
+              colorSensorMatch.get_hue() >= 345) &&
              time < timeout) {
         delay(10);
         time += 10;
       }
     } else {
-      while ((colorSensorMatch().get_hue() <= 240 ||
-              colorSensorMatch().get_hue() >= 200) &&
+      while ((colorSensorMatch.get_hue() <= 240 ||
+              colorSensorMatch.get_hue() >= 200) &&
              time < timeout) {
         delay(10);
         time += 10;
@@ -242,21 +242,85 @@ public:
 
 score_State balls;
 
+bool in = false;
+bool top = false;
+bool mid = false;
+bool bottom = false;
+
 void scoring() {
   while (true) {
 
     if (userInput.get_digital(DIGITAL_R2)) {
-      balls.store();
+      if (!in) {
+        in = true;
+        top = false;
+        mid = false;
+        bottom = false;
+        balls.store();
+      } else {
+        balls.cancel();
+        in = false;
+        top = false;
+        mid = false;
+        bottom = false;
+      }
     } else if (userInput.get_digital(DIGITAL_R1)) {
-      balls.loadTop();
+      if (!top) {
+        in = false;
+        top = true;
+        mid = false;
+        bottom = false;
+        balls.loadTop();
+      } else {
+        balls.cancel();
+        in = false;
+        top = false;
+        mid = false;
+        bottom = false;
+      }
     } else if (userInput.get_digital(DIGITAL_B)) {
-      balls.loadMiddle();
+      if (!middle) {
+        in = false;
+        top = false;
+        mid = true;
+        bottom = false;
+        balls.loadMiddle();
+      } else {
+        balls.cancel();
+        in = false;
+        top = false;
+        mid = false;
+        bottom = false;
+      }
     } else if (userInput.get_digital(DIGITAL_A)) {
+      if (!bottom) {
+        in = false;
+        top = false;
+        middle = false;
+        bottom = true;
+        balls.loadBottom();
+      } else {
+        balls.cancel();
+        in = false;
+        top = false;
+        mid = false;
+        d bottom = false;
+      }
       balls.loadBottom();
     } else if (userInput.get_digital(DIGITAL_X)) {
-      balls.loadMiddleSLOW();
-    } else {
-      balls.cancel();
+      if (!middle) {
+        in = false;
+        top = false;
+        mid = true;
+        bottom = false;
+        balls.loadMiddleSLOW();
+      } else {
+        balls.cancel();
+        in = false;
+        top = false;
+        mid = false;
+        bottom = false;
+      }
     }
     delay(20);
   }
@@ -315,7 +379,7 @@ void initialize() {
 
   ////////////////////////
   chassis.calibrate();
-  chassis.setBrakeMode(E_MOTOR_BRAKE_HOLD);
+  chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
   Task averagingTask(avgIMU);
   lv_screen_load(uiScreen);
 }
@@ -329,8 +393,8 @@ RclSensor LF(&leftFront, 0, 20, 0, 1);
 RclSensor RF(&rightFront, 0, 20, 0, 1);
 
 void autonomous() {
-  colorSensorMatch().set_led_pwm(100);
-  colorSensorScore().set_led_pwm(100);
+  colorSensorMatch.set_led_pwm(100);
+  colorSensorScore.set_led_pwm(100);
 
   switch (selected) {
   case Left:
