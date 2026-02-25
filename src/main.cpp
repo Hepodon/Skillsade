@@ -353,11 +353,13 @@ void rightAuton(lv_event_t *e) {
 }
 
 void createLvglButton(lv_obj_t *obj, const char *text, lv_event_cb_t event_cb,
-                      int width, int height, lv_align_t align, int x_ofs,
-                      int y_ofs, lv_palette_t color = LV_PALETTE_BLUE) {
+                      int width, int height, lv_obj_t *base, lv_align_t align,
+                      int x_ofs, int y_ofs,
+                      lv_palette_t color = LV_PALETTE_BLUE) {
   lv_obj_t *button = lv_obj_create(obj);
+  lv_obj_clean(button);
   lv_obj_set_size(button, width, height);
-  lv_obj_align_to(button, NULL, align, x_ofs, y_ofs);
+  lv_obj_align_to(button, base, align, x_ofs, y_ofs);
   lv_obj_set_style_radius(button, 20, 0);
   lv_obj_set_style_bg_color(button, lv_palette_main(color), LV_STATE_DEFAULT);
   lv_obj_set_style_bg_color(button, lv_palette_darken(color, 3),
@@ -365,11 +367,16 @@ void createLvglButton(lv_obj_t *obj, const char *text, lv_event_cb_t event_cb,
 
   lv_obj_t *label = lv_label_create(button);
   lv_label_set_text(label, text);
-  lv_obj_center(label);
+  lv_obj_align_to(label, button, LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_add_event_cb(button, event_cb, LV_EVENT_RELEASED, NULL);
 
   lv_obj_set_scrollbar_mode(button, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_set_scrollbar_mode(label, LV_SCROLLBAR_MODE_OFF);
+
+  // lv_obj_set_style_bg_opa(button, LV_OPA_TRANSP, 0);
+  // lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, 0);
+
 }
 
 void initialize() {
@@ -386,13 +393,21 @@ void initialize() {
 
   lv_obj_set_scrollbar_mode(uiScreen, LV_SCROLLBAR_MODE_OFF);
   lv_obj_set_scrollbar_mode(autonScreen, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_set_scrollbar_mode(diagScreen, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_set_scrollbar_mode(trackingScreen, LV_SCROLLBAR_MODE_OFF);
 
-  lv_obj_align_to(autonScreen, lv_screen_active(), LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_t *rightButton = lv_obj_create(autonScreen);
 
-  createLvglButton(rightButton, "TEST", rightAuton, 100, 50, LV_ALIGN_CENTER,
-                   -20, 20, LV_PALETTE_RED);
+  lv_obj_set_size(autonScreen, 480, 272);
+  
+  lv_obj_set_style_bg_opa(rightButton, LV_OPA_TRANSP, 0);
+
+
+  lv_obj_align_to(rightButton, autonScreen, LV_ALIGN_CENTER, 0, 0);
+
+  // createLvglButton(rightButton, "TEST", rightAuton, 100, 50, uiScreen,
+  //                  LV_ALIGN_CENTER, 0, 0, LV_PALETTE_RED);
 
   ////////////////////////
   chassis.calibrate();
