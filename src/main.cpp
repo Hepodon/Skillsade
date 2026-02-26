@@ -7,6 +7,7 @@
 #include "liblvgl/core/lv_obj_scroll.h"
 #include "liblvgl/core/lv_obj_tree.h"
 #include "liblvgl/display/lv_display.h"
+#include "liblvgl/lvgl.h"
 #include "liblvgl/misc/lv_area.h"
 #include "liblvgl/misc/lv_types.h"
 #include "pros/abstract_motor.hpp"
@@ -17,25 +18,25 @@
 #include "pros/motors.h"
 #include "pros/motors.hpp"
 #include "pros/optical.hpp"
+
 #include <cmath>
 #include <cstdio>
-using namespace pros;
 
-MotorGroup aleft({-10, -9, -8});
-MotorGroup aright({1, 2, 3});
+pros::MotorGroup aleft({-10, -9, -8});
+pros::MotorGroup aright({1, 2, 3});
 
-MotorGroup middle({7, -4});
+pros::MotorGroup middle({7, -4});
 
-adi::Pneumatics match('a', false);
-adi::Pneumatics arm('h', false);
-adi::Pneumatics tripstate('e', false);
-adi::Pneumatics tripstate2('b', false);
+pros::adi::Pneumatics match('a', false);
+pros::adi::Pneumatics arm('h', false);
+pros::adi::Pneumatics tripstate('b', false);
+pros::adi::Pneumatics tripstate2('e', false);
 
-Rotation vertRot(5);
+pros::Rotation vertRot(5);
 
 lemlib::TrackingWheel vert(&vertRot, lemlib::Omniwheel::NEW_2, 0.75);
 
-IMU imu(6);
+pros::IMU imu(6);
 
 lemlib::Drivetrain DT(&aleft, &aright, 4, 12, 12, 6);
 
@@ -69,9 +70,121 @@ lemlib::ControllerSettings
 
 lemlib::Chassis chassis(DT, lateral_controller, angular_controller, sensors);
 
-Controller userInput(E_CONTROLLER_MASTER);
+pros::Controller userInput(pros::E_CONTROLLER_MASTER);
 
-void initialize() { chassis.calibrate(); }
+using namespace pros;
+
+enum auton { Left, Right, rSolo, skills };
+
+auton selected;
+
+void rightAuton(lv_event_t *e) {
+  selected = Right;
+  lv_obj_clean(lv_screen_active());
+}
+
+void createLvglButton(lv_obj_t *button, const char *text,
+                      lv_event_cb_t event_cb, int width, int height,
+                      lv_obj_t *base, lv_align_t align, int x_ofs, int y_ofs,
+                      lv_palette_t color = LV_PALETTE_BLUE) {
+  lv_obj_set_size(button, width, height);
+  lv_obj_align_to(button, base, align, x_ofs, y_ofs);
+  lv_obj_set_style_radius(button, 20, 0);
+  lv_obj_set_style_bg_color(button, lv_palette_main(color), LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_color(button, lv_palette_darken(color, 3),
+                            LV_STATE_PRESSED);
+
+  lv_obj_t *label = lv_label_create(button);
+  lv_label_set_text(label, text);
+  lv_obj_align_to(label, button, LV_ALIGN_CENTER, 0, 0);
+
+  lv_obj_add_event_cb(button, event_cb, LV_EVENT_RELEASED, NULL);
+
+  lv_obj_set_scrollbar_mode(button, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_set_scrollbar_mode(label, LV_SCROLLBAR_MODE_OFF);
+
+  // lv_obj_set_style_bg_opa(button, LV_OPA_TRANSP, 0);
+  // lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, 0);
+}
+
+bool abc = true;
+
+void initialize() {
+  if (!abc) {
+
+    lv_init();
+
+    lv_obj_clean(lv_screen_active());
+    ///////////////////////
+
+    lv_obj_t *autonScreen = lv_obj_create(NULL);
+    lv_obj_t *trackingScreen = lv_obj_create(NULL);
+    lv_obj_t *diagScreen = lv_obj_create(NULL);
+    lv_obj_t *uiScreen = lv_obj_create(NULL);
+
+    lv_obj_set_scrollbar_mode(uiScreen, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scrollbar_mode(autonScreen, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scrollbar_mode(diagScreen, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scrollbar_mode(trackingScreen, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *rightButton = lv_button_create(autonScreen);
+    lv_obj_t *leftButton = lv_button_create(autonScreen);
+    lv_obj_t *rSoloButton = lv_button_create(autonScreen);
+
+    lv_obj_t *blueButton = lv_button_create(autonScreen);
+    lv_obj_t *redButton = lv_button_create(autonScreen);
+
+    lv_obj_set_size(autonScreen, 480, 272);
+
+    lv_obj_set_style_bg_opa(rSoloButton, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_opa(rightButton, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_opa(leftButton, LV_OPA_TRANSP, 0);
+
+    lv_obj_set_style_bg_opa(blueButton, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_opa(redButton, LV_OPA_TRANSP, 0);
+
+    lv_obj_align_to(rightButton, autonScreen, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align_to(leftButton, autonScreen, LV_ALIGN_CENTER, 0, 60);
+    lv_obj_align_to(rSoloButton, autonScreen, LV_ALIGN_CENTER, 0, -60);
+
+    lv_obj_align_to(redButton, autonScreen, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_align_to(blueButton, autonScreen, LV_ALIGN_RIGHT_MID, 0, 0);
+
+    createLvglButton(leftButton, "Left", rightAuton, 350, 50, autonScreen,
+                     LV_ALIGN_CENTER, 0, 0, LV_PALETTE_RED);
+
+    createLvglButton(rightButton, "Right", rightAuton, 350, 50, autonScreen,
+                     LV_ALIGN_CENTER, 0, 55, LV_PALETTE_RED);
+
+    createLvglButton(rSoloButton, "Right Solo", rightAuton, 350, 50,
+                     autonScreen, LV_ALIGN_CENTER, 0, -55, LV_PALETTE_RED);
+
+    // createLvglButton(redButton, "Right Solo", rightAuton, 350, 50,
+    // autonScreen,
+    //                  LV_ALIGN_CENTER, 0, -55, LV_PALETTE_RED);
+    // createLvglButton(rSoloButton, "Right Solo", rightAuton, 350, 50,
+    // autonScreen,
+    //                  LV_ALIGN_CENTER, 0, -55, LV_PALETTE_RED);
+
+    lv_screen_load(autonScreen);
+    ////////////////////////
+  } else {
+    pros::lcd::initialize(); // initialize brain screen
+    // print position to brain screen
+    pros::Task screen_task([&]() {
+      while (true) {
+        // print robot location to the brain screen
+        pros::lcd::print(0, "X: %f", chassis.getPose().x);         // x
+        pros::lcd::print(1, "Y: %f", chassis.getPose().y);         // y
+        pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+        // delay to save resources
+        pros::delay(20);
+      }
+    });
+  }
+  chassis.calibrate();
+  chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
+}
 
 void disabled() {}
 
@@ -141,10 +254,9 @@ void outtake() {
   top = false;
   mid = false;
   in = false;
+  middle.move(-127);
   while (userInput.get_digital(DIGITAL_B)) {
-    tripstate.extend();
-    tripstate2.extend();
-    middle.move(-127);
+    delay(5);
   }
   middle.brake();
 
