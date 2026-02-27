@@ -19,6 +19,7 @@
 #include "pros/optical.hpp"
 #include <cmath>
 #include <cstdio>
+#include <thread>
 
 using namespace pros;
 using namespace std;
@@ -43,27 +44,23 @@ Motor sorter(static_cast<signed char>(motorPorts[8][0]));
 adi::Pneumatics match('a', false);
 adi::Pneumatics arm('h', false);
 
-Distance rightFront(0);
-Distance rightBack(0);
-Distance leftFront(0);
-Distance leftBack(0);
-Distance front(0);
-Distance matchDist(0);
+Distance leftD(4);
+Distance rightD(21);
+Distance leftFront(15);
+Distance rightFront(5);
+Distance matchDist(20);
 
-RclSensor F(&front, 0, 20, 0, 1);
-RclSensor LF(&leftFront, 0, 20, 0, 1);
-RclSensor RF(&rightFront, 0, 20, 0, 1);
+Rotation vertRotation(10);
+bool done = true;
 
-Rotation vertRotation(-5);
-
-v5::Optical colorSensorMatch(0);
-v5::Optical colorSensorScore(0);
+v5::Optical colorSensorMatch(13);
+v5::Optical colorSensorScore(14);
 
 lemlib::Drivetrain DT(&aleft, &aright, 12.72, lemlib::Omniwheel::NEW_325, 450,
                       8);
 
-IMU inertial1(4);
-IMU inertial2(-11);
+IMU inertial1(2);
+IMU inertial2(16);
 
 lemlib::TrackingWheel leftVert(&vertRotation, lemlib::Omniwheel::NEW_2, 0.0, 1);
 
@@ -71,33 +68,31 @@ lemlib::OdomSensors sensors(&leftVert, nullptr, nullptr, nullptr, &inertial1);
 
 // lateral PID controller
 lemlib::ControllerSettings
-    lateral_controller(10,  // proportional gain (kP)
-                       0,   // integral gain (kI)
-                       3,   // derivative gain (kD)
-                       3,   // anti windup
-                       1,   // small error range, in inches
-                       100, // small error range timeout, in milliseconds
-                       3,   // large error range, in inches
-                       500, // large error range timeout, in milliseconds
-                       20   // maximum acceleration (slew)
+    lateral_controller(4.925, // proportional gain (kP)
+                       0,     // integral gain (kI)
+                       4,     // derivative gain (kD)
+                       3,     // anti windup
+                       1,     // small error range, in inches
+                       100,   // small error range timeout, in milliseconds
+                       3,     // large error range, in inches
+                       300,   // large error range timeout, in milliseconds
+                       20     // maximum acceleration (slew)
     );
 
 // angular PID controller
 lemlib::ControllerSettings
-    angular_controller(2,   // proportional gain (kP)
-                       0,   // integral gain (kI)
-                       10,  // derivative gain (kD)
-                       3,   // anti windup
-                       1,   // small error range, in degrees
-                       100, // small error range timeout, in milliseconds
-                       3,   // large error range, in degrees
-                       500, // large error range timeout, in milliseconds
-                       0    // maximum acceleration (slew)
+    angular_controller(4.49, // proportional gain (kP)
+                       0,    // integral gain (kI)
+                       32.5, // derivative gain (kD)
+                       3,    // anti windup
+                       1,    // small error range, in degrees
+                       100,  // small error range timeout, in milliseconds
+                       2,    // large error range, in degrees
+                       300,  // large error range timeout, in milliseconds
+                       0     // maximum acceleration (slew)
     );
 
 lemlib::Chassis chassis(DT, lateral_controller, angular_controller, sensors);
-
-RclTracking rcl(&chassis);
 
 Controller userInput(E_CONTROLLER_MASTER);
 
@@ -110,47 +105,35 @@ void avgIMU() {
 }
 
 bool leftAuton = false;
-
 void setPoseFromAllSensors() {
   const double FIELD_W = 3658.0; // mm
   const double FIELD_H = 3658.0; // mm
 
-  // Distance from center of bot to sensors
-  const int SIDE_OFFSET = 90.0;
-  const int FRONT_OFFSET = 85.0;
+  const double SIDE_OFFSET = 90.0;
+  const double FRONT_OFFSET = 85.0;
+  const double sensorSpacing = 146.0;
 
-  // Distance between front and back sensors
-  const int sensorSpacing = 180.0;
-
-  // Read sensors
   double lf = leftFront.get();
-  double lb = leftBack.get();
   double rf = rightFront.get();
-  double rb = rightBack.get();
-  double f = front.get();
 
-  // Angle from walls
-  double thetaLeft = atan2(lf - lb, sensorSpacing) * 180 / M_PI;
-  double thetaRight = atan2(rf - rb, sensorSpacing) * 180 / M_PI;
+  // Angle relative to wall
+  double theta = atan2(lf - rf, sensorSpacing) * 180.0 / M_PI;
 
-  double theta = leftAuton ? thetaLeft : thetaRight;
+  // Correct heading using inertial
+  double correctedHeading = inertial1.get_heading() - theta;
 
-  // Heading
-  double imuHeading = inertial1.get_heading();
-  double heading = imuHeading - theta;
+  // Position from front wall
+  double avgFront = (lf + rf) / 2.0;
+  double y = FIELD_H - (avgFront + FRONT_OFFSET);
 
-  // X position
-  double xLeft = (lf + lb) / 2 + SIDE_OFFSET;
-  double xRight = FIELD_W - ((rf + rb) / 2 + SIDE_OFFSET);
-  double x = (xLeft + xRight) / 2;
+  // X would require side sensors
+  double x = rightD.get() *
+             cos(correctedHeading); // Placeholder until side sensors used
+  x /= 25.4;
+  y /= 25.4;
 
-  // Y position
-  double y = FIELD_H - (f + FRONT_OFFSET);
-
-  // Convert to inches
-  chassis.setPose(x / 25.4, y / 25.4, heading);
+  chassis.setPose(x, y, correctedHeading);
 }
-
 enum teamColor { red, blue };
 enum where { top, middle, middleSlow };
 
@@ -171,6 +154,12 @@ public:
     topOut.move(-127);
     sorter.move(-127);
     intake.move(-127);
+  }
+
+  void loadTopSlow() {
+    topOut.move(-100);
+    sorter.move(-100);
+    intake.move(-100);
   }
 
   // Score blocks on central upper goal
@@ -199,16 +188,15 @@ public:
     sorter.move(0);
     intake.move(0);
   }
-
   void intakeUntilOppCol(teamColor color, int timeout) {
-    store();
+    done = false;
     int time = 0;
     if (color == red) {
-      while ((colorSensorMatch.get_hue() <= 15 ||
-              colorSensorMatch.get_hue() >= 345) &&
+      while ((colorSensorMatch.get_hue() <= 70 ||
+              colorSensorMatch.get_hue() >= 290) &&
              time < timeout) {
-        delay(10);
-        time += 10;
+        delay(100);
+        time += 100;
       }
     } else {
       while ((colorSensorMatch.get_hue() <= 240 ||
@@ -218,24 +206,27 @@ public:
         time += 10;
       }
     }
+    done = true;
   }
 
   void scoreUntilOppCol(teamColor color, int timeout, where where = top) {
     if (where == top) {
-      loadTop();
+      loadTopSlow();
     } else if (where == middle) {
       loadMiddle();
     } else {
       loadMiddleSLOW();
     }
+    done = false;
     int time = 0;
     if (color == red) {
-      while ((colorSensorMatch.get_hue() <= 15 ||
-              colorSensorMatch.get_hue() >= 345) &&
+      while ((colorSensorMatch.get_hue() <= 100 ||
+              colorSensorMatch.get_hue() >= 290) &&
              time < timeout) {
-        delay(10);
-        time += 10;
+        delay(5);
+        time += 5;
       }
+      loadMiddle();
     } else {
       while ((colorSensorMatch.get_hue() <= 240 ||
               colorSensorMatch.get_hue() >= 200) &&
@@ -345,19 +336,16 @@ void diagnosticsUpdater() {
 
 enum auton { Left, Right, rSolo, skills };
 
-auton selected;
-
+auton selected = Right;
 void rightAuton(lv_event_t *e) {
   selected = Right;
   lv_obj_clean(lv_screen_active());
 }
 
-void createLvglButton(lv_obj_t *obj, const char *text, lv_event_cb_t event_cb,
-                      int width, int height, lv_obj_t *base, lv_align_t align,
-                      int x_ofs, int y_ofs,
+void createLvglButton(lv_obj_t *button, const char *text,
+                      lv_event_cb_t event_cb, int width, int height,
+                      lv_obj_t *base, lv_align_t align, int x_ofs, int y_ofs,
                       lv_palette_t color = LV_PALETTE_BLUE) {
-  lv_obj_t *button = lv_obj_create(obj);
-  lv_obj_clean(button);
   lv_obj_set_size(button, width, height);
   lv_obj_align_to(button, base, align, x_ofs, y_ofs);
   lv_obj_set_style_radius(button, 20, 0);
@@ -378,40 +366,75 @@ void createLvglButton(lv_obj_t *obj, const char *text, lv_event_cb_t event_cb,
   // lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, 0);
 }
 
+bool abc = true;
+
 void initialize() {
+  if (!abc) {
 
-  lv_init();
+    lv_init();
 
-  lv_obj_clean(lv_screen_active());
-  ///////////////////////
+    lv_obj_clean(lv_screen_active());
+    ///////////////////////
 
-  lv_obj_t *autonScreen = lv_obj_create(NULL);
-  lv_obj_t *trackingScreen = lv_obj_create(NULL);
-  lv_obj_t *diagScreen = lv_obj_create(NULL);
-  lv_obj_t *uiScreen = lv_obj_create(NULL);
+    lv_obj_t *autonScreen = lv_obj_create(NULL);
+    lv_obj_t *trackingScreen = lv_obj_create(NULL);
+    lv_obj_t *diagScreen = lv_obj_create(NULL);
+    lv_obj_t *uiScreen = lv_obj_create(NULL);
 
-  lv_obj_set_scrollbar_mode(uiScreen, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_set_scrollbar_mode(autonScreen, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_set_scrollbar_mode(diagScreen, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_set_scrollbar_mode(trackingScreen, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scrollbar_mode(uiScreen, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scrollbar_mode(autonScreen, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scrollbar_mode(diagScreen, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scrollbar_mode(trackingScreen, LV_SCROLLBAR_MODE_OFF);
 
-  lv_obj_t *rightButton = lv_obj_create(autonScreen);
+    lv_obj_t *rightButton = lv_button_create(autonScreen);
+    lv_obj_t *leftButton = lv_button_create(autonScreen);
+    lv_obj_t *rSoloButton = lv_button_create(autonScreen);
 
-  // lv_obj_set_size(autonScreen, 480, 272);
+    lv_obj_t *blueButton = lv_button_create(autonScreen);
+    lv_obj_t *redButton = lv_button_create(autonScreen);
 
-  lv_obj_set_style_bg_opa(rightButton, LV_OPA_TRANSP, 0);
+    lv_obj_set_size(autonScreen, 480, 272);
 
-  lv_obj_align_to(rightButton, autonScreen, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_opa(rSoloButton, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_opa(rightButton, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_opa(leftButton, LV_OPA_TRANSP, 0);
 
-  // createLvglButton(rightButton, "TEST", rightAuton, 100, 50, uiScreen,
-  //                  LV_ALIGN_CENTER, 0, 0, LV_PALETTE_RED);
+    lv_obj_set_style_bg_opa(blueButton, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_opa(redButton, LV_OPA_TRANSP, 0);
 
-  ////////////////////////
+    lv_obj_align_to(rightButton, autonScreen, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align_to(leftButton, autonScreen, LV_ALIGN_CENTER, 0, 60);
+    lv_obj_align_to(rSoloButton, autonScreen, LV_ALIGN_CENTER, 0, -60);
+
+    lv_obj_align_to(redButton, autonScreen, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_align_to(blueButton, autonScreen, LV_ALIGN_RIGHT_MID, 0, 0);
+
+    createLvglButton(leftButton, "Left", rightAuton, 350, 50, autonScreen,
+                     LV_ALIGN_CENTER, 0, 0, LV_PALETTE_RED);
+
+    createLvglButton(rightButton, "Right", rightAuton, 350, 50, autonScreen,
+                     LV_ALIGN_CENTER, 0, 55, LV_PALETTE_RED);
+
+    createLvglButton(rSoloButton, "Right Solo", rightAuton, 350, 50,
+                     autonScreen, LV_ALIGN_CENTER, 0, -55, LV_PALETTE_RED);
+
+    // createLvglButton(redButton, "Right Solo", rightAuton, 350, 50,
+    // autonScreen,
+    //                  LV_ALIGN_CENTER, 0, -55, LV_PALETTE_RED);
+    // createLvglButton(rSoloButton, "Right Solo", rightAuton, 350, 50,
+    // autonScreen,
+    //                  LV_ALIGN_CENTER, 0, -55, LV_PALETTE_RED);
+
+    lv_screen_load(autonScreen);
+    ////////////////////////
+  } else {
+    pros::lcd::initialize(); // initialize brain screen
+  }
+  // Task imuTask(avgIMU);
   chassis.calibrate();
-  rcl.startTracking();
+  colorSensorMatch.set_led_pwm(100);
+  colorSensorScore.set_led_pwm(100);
   chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
-  Task averagingTask(avgIMU);
-  lv_screen_load(autonScreen);
 }
 
 void disabled() {}
@@ -419,6 +442,9 @@ void disabled() {}
 void competition_initialize() {}
 
 void autonomous() {
+  match.extend();
+  setPoseFromAllSensors();
+  Task avgTask(avgIMU);
   colorSensorMatch.set_led_pwm(100);
   colorSensorScore.set_led_pwm(100);
 
@@ -426,9 +452,28 @@ void autonomous() {
   case Left:
     break;
   case Right:
+    while (true) {
+      // print robot location to the brain screen
+      pros::lcd::print(0, "X: %f    matchHue: %f", chassis.getPose().x,
+                       colorSensorMatch.get_hue()); // x
+      pros::lcd::print(1, "Y: %f    topHue: %f", chassis.getPose().y,
+                       colorSensorScore.get_hue());              // y
+      pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
 
-    balls.intakeUntilOppCol(red, 5000);
-    balls.cancel();
+      pros::lcd::print(3, "left DS: %d", leftD.get());          // heading
+      pros::lcd::print(4, "Right DS: %d", rightD.get());        // heading
+      pros::lcd::print(5, "leftFront DS: %d", leftFront.get()); // heading
+      pros::lcd::print(6, "rightFront: %d", rightFront.get());  // heading
+
+      pros::lcd::print(7, "match DS: %d", matchDist.get()); // heading
+      // delay to save resources
+      pros::delay(100);
+    }
+    // chassis.turnToHeading(90, 1000);
+    // chassis.turnToHeading(0, 1000);
+    // chassis.turnToHeading(180, 1000);
+    // chassis.waitUntilDone();
+    // balls.store();
 
     break;
   case rSolo:
@@ -439,6 +484,26 @@ void autonomous() {
 }
 
 void opcontrol() {
+  // print position to brain screen
+  pros::Task screen_task([&]() {
+    while (true) {
+      // print robot location to the brain screen
+      pros::lcd::print(0, "X: %f    matchHue: %f", chassis.getPose().x,
+                       colorSensorMatch.get_hue()); // x
+      pros::lcd::print(1, "Y: %f    topHue: %f", chassis.getPose().y,
+                       colorSensorScore.get_hue());              // y
+      pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+
+      pros::lcd::print(3, "left DS: %d", leftD.get());          // heading
+      pros::lcd::print(4, "Right DS: %d", rightD.get());        // heading
+      pros::lcd::print(5, "leftFront DS: %d", leftFront.get()); // heading
+      pros::lcd::print(6, "rightFront: %d", rightFront.get());  // heading
+
+      pros::lcd::print(7, "match DS: %d", matchDist.get()); // heading
+      // delay to save resources
+      pros::delay(100);
+    }
+  });
   // Ball management task
   Task scoreTask(scoring);
   while (true) {
@@ -448,6 +513,13 @@ void opcontrol() {
 
     // Apply controller input for movement using split arcade controls
     chassis.arcade(leftY, rightX, true, 0.40);
+
+    if (userInput.get_digital_new_press(DIGITAL_L2)) {
+      match.toggle();
+    }
+    if (userInput.get_digital_new_press(DIGITAL_L1)) {
+      arm.toggle();
+    }
 
     delay(10);
   }
