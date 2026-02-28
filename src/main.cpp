@@ -583,7 +583,7 @@ void autonomous() { /*
   case skills:
     break;
   }
-}
+}//hi
 
 void opcontrol() {
 
