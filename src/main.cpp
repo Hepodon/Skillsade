@@ -68,15 +68,15 @@ lemlib::OdomSensors sensors(&leftVert, nullptr, nullptr, nullptr, &inertial1);
 
 // lateral PID controller
 lemlib::ControllerSettings
-    lateral_controller(4.925, // proportional gain (kP)
-                       0,     // integral gain (kI)
-                       4,     // derivative gain (kD)
-                       3,     // anti windup
-                       1,     // small error range, in inches
-                       100,   // small error range timeout, in milliseconds
-                       3,     // large error range, in inches
-                       300,   // large error range timeout, in milliseconds
-                       20     // maximum acceleration (slew)
+    lateral_controller(4.93, // proportional gain (kP)
+                       0,    // integral gain (kI)
+                       4,    // derivative gain (kD)
+                       3,    // anti windup
+                       1,    // small error range, in inches
+                       100,  // small error range timeout, in milliseconds
+                       3,    // large error range, in inches
+                       300,  // large error range timeout, in milliseconds
+                       20    // maximum acceleration (slew)
     );
 
 // angular PID controller
@@ -96,6 +96,9 @@ lemlib::Chassis chassis(DT, lateral_controller, angular_controller, sensors);
 
 Controller userInput(E_CONTROLLER_MASTER);
 
+const double FIELD_W = 3658.0; // mm
+const double FIELD_H = 3658.0; // mm
+
 void avgIMU() {
   while (true) {
     inertial1.set_heading((inertial1.get_heading() + inertial2.get_heading()) /
@@ -104,36 +107,110 @@ void avgIMU() {
   }
 }
 
-bool leftAuton = false;
-void setPoseFromAllSensors() {
-  const double FIELD_W = 3658.0; // mm
-  const double FIELD_H = 3658.0; // mm
+constexpr double MM_TO_IN = 1.0 / 25.4;
+constexpr double FIELD_W_MM = 3658.0;
+constexpr double FIELD_H_MM = 3658.0;
 
-  const double SIDE_OFFSET = 90.0;
-  const double FRONT_OFFSET = 85.0;
-  const double sensorSpacing = 146.0;
+double clamp(double v, double lo, double hi) { return fmax(lo, fmin(v, hi)); }
+
+double confidenceFromDist(double mm) {
+  if (mm < 20 || mm > 2000)
+    return 0.0;
+  if (mm < 60 || mm > 1500)
+    return 0.4;
+  return 1.0;
+}
+
+double confidenceFromAngle(double deg, double ideal, double maxErr = 15.0) {
+  double err = fabs(deg - ideal);
+  return clamp(1.0 - err / maxErr, 0.0, 1.0);
+}
+
+double blend(double current, double measured, double confidence) {
+  return current + (measured - current) * confidence;
+}
+
+float updateThetaFromFrontAlways() {
+  constexpr double SENSOR_SPACING_MM = 146.0;
 
   double lf = leftFront.get();
   double rf = rightFront.get();
 
-  // Angle relative to wall
-  double theta = atan2(lf - rf, sensorSpacing) * 180.0 / M_PI;
+  double thetaRad = atan2(lf - rf, SENSOR_SPACING_MM);
+  double thetaDeg = thetaRad * 180.0 / M_PI;
 
-  // Correct heading using inertial
-  double correctedHeading = inertial1.get_heading() - theta;
-
-  // Position from front wall
-  double avgFront = (lf + rf) / 2.0;
-  double y = FIELD_H - (avgFront + FRONT_OFFSET);
-
-  // X would require side sensors
-  double x = rightD.get() *
-             cos(correctedHeading); // Placeholder until side sensors used
-  x /= 25.4;
-  y /= 25.4;
-
-  chassis.setPose(x, y, correctedHeading);
+  return thetaDeg;
 }
+
+void updateXFromRightAlways() {
+  constexpr double SIDE_OFFSET_MM = 0.0;
+
+  double rightDist = rightD.get();
+  double distConfidence = confidenceFromDist(rightDist);
+
+  auto pose = chassis.getPose();
+  double thetaRad = pose.theta * M_PI / 180.0;
+
+  double angleConfidence = clamp(cos(thetaRad), 0.0, 1.0);
+  double confidence = distConfidence * angleConfidence;
+
+  double projected = (rightDist + SIDE_OFFSET_MM) * fabs(cos(thetaRad));
+  double measuredXmm = FIELD_W_MM - projected;
+  double measuredXin = measuredXmm * MM_TO_IN;
+
+  double blendedX = blend(pose.x, measuredXin, confidence);
+
+  chassis.setPose(blendedX, pose.y, pose.theta);
+}
+
+void updateXFromLeftAlways() {
+  constexpr double SIDE_OFFSET_MM = 0.0;
+
+  double leftDist = leftD.get();
+
+  auto pose = chassis.getPose();
+  double thetaRad = pose.theta * M_PI / 180.0;
+
+  double projected = (leftDist + SIDE_OFFSET_MM) * fabs(cos(thetaRad));
+  double measuredXin = projected * MM_TO_IN;
+
+  chassis.setPose(measuredXin, pose.y, pose.theta);
+}
+
+void updateYFromFrontAlways() {
+  constexpr double FRONT_OFFSET_MM = 85.0;
+
+  double lf = leftFront.get();
+  double rf = rightFront.get();
+
+  auto pose = chassis.getPose();
+  double thetaRad = pose.theta * M_PI / 180.0;
+
+  double avgFront = (lf + rf) / 2.0;
+  double projected = (avgFront + FRONT_OFFSET_MM) * fabs(cos(thetaRad));
+
+  double measuredYmm = FIELD_H_MM - projected;
+  double measuredYin = measuredYmm * MM_TO_IN;
+  chassis.setPose(pose.x, measuredYin, pose.theta);
+}
+
+void updateXFromFrontAlways() {
+  constexpr double FRONT_OFFSET_MM = 85.0;
+
+  double lf = leftFront.get();
+  double rf = rightFront.get();
+
+  auto pose = chassis.getPose();
+  double thetaRad = pose.theta * M_PI / 180.0;
+
+  double avgFront = (lf + rf) / 2.0;
+  double projected = (avgFront + FRONT_OFFSET_MM) * fabs(cos(thetaRad));
+
+  double measuredXmm = projected;
+  double measuredXin = measuredXmm * MM_TO_IN;
+  chassis.setPose(measuredXin, pose.y, pose.theta);
+}
+
 enum teamColor { red, blue };
 enum where { top, middle, middleSlow };
 
@@ -190,6 +267,7 @@ public:
   }
   void intakeUntilOppCol(teamColor color, int timeout) {
     done = false;
+    store();
     int time = 0;
     if (color == red) {
       while ((colorSensorMatch.get_hue() <= 70 ||
@@ -205,6 +283,17 @@ public:
         delay(10);
         time += 10;
       }
+    }
+    done = true;
+  }
+
+  void intakeUntilDone(int timeout) {
+    done = false;
+    store();
+    int time = 0;
+    while ((matchDist.get() < 255) && time < timeout) {
+      delay(150);
+      time += 100;
     }
     done = true;
   }
@@ -323,8 +412,6 @@ void scoring() {
   }
 }
 
-void screenInit() {}
-
 void diagnosticsUpdater() {
   while (true) {
     for (int i = 0; i < 9; i++) {
@@ -430,51 +517,66 @@ void initialize() {
   } else {
     pros::lcd::initialize(); // initialize brain screen
   }
-  // Task imuTask(avgIMU);
   chassis.calibrate();
+  // setPoseFromAllSensors();
+  Task imuTask(avgIMU);
   colorSensorMatch.set_led_pwm(100);
   colorSensorScore.set_led_pwm(100);
-  chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
+  chassis.setBrakeMode(E_MOTOR_BRAKE_HOLD);
 }
 
 void disabled() {}
 
 void competition_initialize() {}
 
-void autonomous() {
+void autonomous() { /*
+   pros::Task screen_task([&]() {
+     while (true) {
+       // print robot location to the brain screen
+       pros::lcd::print(0, "X: %f    matchHue: %f", chassis.getPose().x,
+                        colorSensorMatch.get_hue()); // x
+       pros::lcd::print(1, "Y: %f    topHue: %f", chassis.getPose().y,
+                        colorSensorScore.get_hue());              // y
+       pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+
+       pros::lcd::print(3, "left DS: %d", leftD.get());          // heading
+       pros::lcd::print(4, "Right DS: %d", rightD.get());        // heading
+       pros::lcd::print(5, "leftFront DS: %d", leftFront.get()); // heading
+       pros::lcd::print(6, "rightFront: %d", rightFront.get());  // heading
+
+       pros::lcd::print(7, "match DS: %d", matchDist.get()); // heading
+       // delay to save resources
+       pros::delay(100);
+     }
+   });*/
   match.extend();
-  setPoseFromAllSensors();
-  Task avgTask(avgIMU);
-  colorSensorMatch.set_led_pwm(100);
-  colorSensorScore.set_led_pwm(100);
+  colorSensorMatch.set_led_pwm(80);
 
   switch (selected) {
   case Left:
     break;
   case Right:
-    while (true) {
-      // print robot location to the brain screen
-      pros::lcd::print(0, "X: %f    matchHue: %f", chassis.getPose().x,
-                       colorSensorMatch.get_hue()); // x
-      pros::lcd::print(1, "Y: %f    topHue: %f", chassis.getPose().y,
-                       colorSensorScore.get_hue());              // y
-      pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-
-      pros::lcd::print(3, "left DS: %d", leftD.get());          // heading
-      pros::lcd::print(4, "Right DS: %d", rightD.get());        // heading
-      pros::lcd::print(5, "leftFront DS: %d", leftFront.get()); // heading
-      pros::lcd::print(6, "rightFront: %d", rightFront.get());  // heading
-
-      pros::lcd::print(7, "match DS: %d", matchDist.get()); // heading
-      // delay to save resources
-      pros::delay(100);
-    }
-    // chassis.turnToHeading(90, 1000);
-    // chassis.turnToHeading(0, 1000);
-    // chassis.turnToHeading(180, 1000);
-    // chassis.waitUntilDone();
-    // balls.store();
-
+    chassis.moveToPoint(-4, 35, 3000);
+    delay(200);
+    chassis.turnToPoint(5, 35, 3000);
+    chassis.moveToPose(6, 36, 90, 3000);
+    delay(200);
+    chassis.moveToPoint(-27, 3, 3000, {.forwards = false});
+    delay(200);
+    chassis.moveToPose(-105, 31, -53, 5000, {.lead = 0.5});
+    delay(200);
+    chassis.moveToPose(-80, 37, 270, 3000, {.forwards = false, .minSpeed = 60});
+    balls.loadTop();
+    delay(200);
+    balls.cancel();
+    chassis.moveToPose(-114, 36, 270, 3000);
+    delay(200);
+    chassis.moveToPose(-83, 30, 270, 3000);
+    delay(200);
+    chassis.moveToPose(-93, -66, 142, 3000);
+    delay(200);
+    chassis.moveToPose(-105, -3, 268, 3000);
+    delay(200);
     break;
   case rSolo:
     break;
@@ -484,15 +586,20 @@ void autonomous() {
 }
 
 void opcontrol() {
-  // print position to brain screen
+
+  arm.extend();
+  // print position to brain
+  float f;
   pros::Task screen_task([&]() {
     while (true) {
+      f = updateThetaFromFrontAlways();
       // print robot location to the brain screen
       pros::lcd::print(0, "X: %f    matchHue: %f", chassis.getPose().x,
                        colorSensorMatch.get_hue()); // x
       pros::lcd::print(1, "Y: %f    topHue: %f", chassis.getPose().y,
-                       colorSensorScore.get_hue());              // y
-      pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+                       colorSensorScore.get_hue()); // y
+      pros::lcd::print(2, "Theta: %f    DTheta :%f", chassis.getPose().theta,
+                       f); // heading
 
       pros::lcd::print(3, "left DS: %d", leftD.get());          // heading
       pros::lcd::print(4, "Right DS: %d", rightD.get());        // heading
