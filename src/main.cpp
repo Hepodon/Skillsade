@@ -559,7 +559,7 @@ void autonomous() { /*
     chassis.moveToPoint(-4, 35, 3000);
     delay(200);
     chassis.turnToPoint(5, 35, 3000);
-    chassis.moveToPose(6, 36, 90, 3000);
+    chassis.moveToPose(5, 35, 90, 3000);
     delay(200);
     chassis.moveToPoint(-27, 3, 3000, {.forwards = false});
     delay(200);
