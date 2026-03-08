@@ -109,6 +109,13 @@ void opcontrol() {
     // Apply controller input for movement using split arcade controls
     chassis.arcade(leftY, rightX, true, 0.40);
 
+    if (userInput.get_digital_new_press(DIGITAL_L2)) {
+      match.toggle();
+    }
+    if (userInput.get_digital_new_press(DIGITAL_L1)) {
+      arm.toggle();
+    }
+
     delay(10);
   }
 }
