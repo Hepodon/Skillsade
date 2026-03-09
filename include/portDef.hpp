@@ -1,0 +1,47 @@
+#pragma once
+#include "lemlib/chassis/chassis.hpp"
+#include "lemlib/chassis/trackingWheel.hpp"
+#include "main.h"
+
+extern float motorPorts;
+
+extern pros::MotorGroup aleft;
+extern pros::MotorGroup aright;
+
+extern pros::MotorGroup middle;
+
+extern pros::adi::Pneumatics match;
+extern pros::adi::Pneumatics arm;
+extern pros::adi::Pneumatics tripstate;
+extern pros::adi::Pneumatics tripstate2;
+
+extern pros::Distance Dleft;
+extern pros::Distance Dright;
+extern pros::Distance Dfront;
+extern pros::Distance DbackR;
+extern pros::Distance DbackL;
+
+extern pros::Rotation vertRotation;
+
+extern pros::v5::Optical colorSensorMatch;
+extern pros::v5::Optical colorSensorScore;
+
+extern lemlib::Drivetrain DT;
+
+extern pros::IMU inertial1;
+
+extern lemlib::TrackingWheel leftVert;
+
+extern lemlib::OdomSensors sensors;
+
+// lateral PID controller
+extern lemlib::ControllerSettings lateral_controller;
+
+// angular PID controller
+extern lemlib::ControllerSettings angular_controller;
+
+extern lemlib::Chassis chassis;
+
+extern pros::Controller userInput;
+
+extern void avgIMU();
