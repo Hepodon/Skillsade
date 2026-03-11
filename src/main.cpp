@@ -1,7 +1,10 @@
 #include "main.h"
 #include "controls.hpp"
+#include "graphics.hpp"
+#include "liblvgl/misc/lv_event.h"
 #include "mcl.hpp"
 #include "portDef.hpp"
+#include "pros/screen.hpp"
 #include <cmath>
 #include <cstdio>
 
@@ -82,7 +85,11 @@ enum auton { Left, Right, rSolo, lSolo, skills };
 
 auton selected;
 
-void initialize() { chassis.calibrate(false); }
+void initialize() {
+  chassis.calibrate(false);
+  lvgl_init();
+  screeninit();
+}
 
 void disabled() {}
 
@@ -108,13 +115,6 @@ void opcontrol() {
 
     // Apply controller input for movement using split arcade controls
     chassis.arcade(leftY, rightX, true, 0.40);
-
-    if (userInput.get_digital_new_press(DIGITAL_L2)) {
-      match.toggle();
-    }
-    if (userInput.get_digital_new_press(DIGITAL_L1)) {
-      arm.toggle();
-    }
 
     delay(10);
   }
