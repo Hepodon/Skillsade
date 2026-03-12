@@ -2,6 +2,7 @@
 #include "controls.hpp"
 #include "graphics.hpp"
 #include "liblvgl/misc/lv_event.h"
+#include "liblvgl/misc/lv_types.h"
 #include "mcl.hpp"
 #include "portDef.hpp"
 #include "pros/screen.hpp"
@@ -86,9 +87,10 @@ enum auton { Left, Right, rSolo, lSolo, skills };
 auton selected;
 
 void initialize() {
-  chassis.calibrate(false);
+  chassis.calibrate(true);
   lvgl_init();
   screeninit();
+  Task chartTask(updateChart);
 }
 
 void disabled() {}
