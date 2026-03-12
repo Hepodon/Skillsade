@@ -110,7 +110,6 @@ void initialize() {
   chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
 }
 
-
 void disabled() {}
 
 void competition_initialize() { chassis.calibrate(); }
@@ -118,28 +117,28 @@ void competition_initialize() { chassis.calibrate(); }
 void autonomous() {}
 
 void opcontrol() {
-  // int leftY;
-  // int rightX;
+  int leftY;
+  int rightX;
 
-  // chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
+  chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
 
-  // while (true) {
-  //   // Collect and store controller input
-  //   leftY = userInput.get_analog(E_CONTROLLER_ANALOG_LEFT_Y);
-  //   rightX = userInput.get_analog(E_CONTROLLER_ANALOG_RIGHT_X);
+  while (true) {
+    // Collect and store controller input
+    leftY = userInput.get_analog(E_CONTROLLER_ANALOG_LEFT_Y);
+    rightX = userInput.get_analog(E_CONTROLLER_ANALOG_RIGHT_X);
 
-  //   applyButtons(userInput);
+    applyButtons(userInput);
 
-  //   // Apply controller input for movement using split arcade controls
-  //   chassis.arcade(leftY, rightX, true, 0.40);
+    // Apply controller input for movement using split arcade controls
+    chassis.arcade(leftY, rightX, true, 0.40);
 
-  //   if (userInput.get_digital_new_press(DIGITAL_L2)) {
-  //     match.toggle();
-  //   }
-  //   if (userInput.get_digital_new_press(DIGITAL_L1)) {
-  //     arm.toggle();
-  //   }
+    if (userInput.get_digital_new_press(DIGITAL_L2)) {
+      match.toggle();
+    }
+    if (userInput.get_digital_new_press(DIGITAL_L1)) {
+      arm.toggle();
+    }
 
-  //   delay(10);
-  // }
+    delay(10);
+  }
 }

@@ -47,7 +47,7 @@ void buttonFunction(pros::controller_digital_e_t button) {
   case pros::E_CONTROLLER_DIGITAL_A:
     break;
   case pros::E_CONTROLLER_DIGITAL_B:
-    balls.loadBottom();
+    balls.loadBottomHold(pros::E_CONTROLLER_DIGITAL_B);
     break;
   case pros::E_CONTROLLER_DIGITAL_X:
     break;

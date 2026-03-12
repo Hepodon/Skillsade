@@ -51,10 +51,17 @@ void score_State::loadMiddle() {
 void score_State::loadBottom() {
   if (status != central_lower) {
     middle.move(-127);
-    while (userInput.get_digital(DIGITAL_B)) {
-      pros::delay(5);
-    }
   } else {
     cancel();
   }
+}
+
+// score blocks on central lower goal
+void score_State::loadBottomHold(pros::controller_digital_e_t button) {
+  status = central_lower;
+  middle.move(-127);
+  while (userInput.get_digital(button)) {
+    pros::delay(15);
+  }
+  cancel();
 }

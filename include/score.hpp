@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pros/misc.h"
 class score_State {
 
 public:
@@ -19,6 +20,9 @@ public:
 
   // Score blocks on central upper goal
   void loadMiddle();
+
+  // Score blocks on central upper goal
+  void loadBottomHold(pros::controller_digital_e_t button);
 
   // score blocks on central lower goal
   void loadBottom();
