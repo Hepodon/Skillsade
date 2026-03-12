@@ -6,3 +6,4 @@
 #include <cstring>
 
 extern void screeninit();
+extern void updateChart();
