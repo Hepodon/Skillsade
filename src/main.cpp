@@ -1,6 +1,7 @@
 #include "main.h"
 #include "controls.hpp"
 #include "graphics.hpp"
+#include "liblvgl/display/lv_display.h"
 #include "liblvgl/misc/lv_event.h"
 #include "mcl.hpp"
 #include "portDef.hpp"

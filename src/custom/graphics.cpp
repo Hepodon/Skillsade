@@ -1,3 +1,4 @@
+#include "graphics.hpp"
 #include "autons.hpp"
 #include "liblvgl/core/lv_obj.h"
 #include "liblvgl/core/lv_obj_style_gen.h"
@@ -8,6 +9,7 @@
 #include "portDef.hpp"
 #include "pros/screen.hpp"
 #include <cstring>
+
 
 lv_obj_t *autonScreen;
 lv_obj_t *uiScreen;
@@ -58,11 +60,12 @@ void screeninit() {
   lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
 
   lv_obj_t *autonButton = createLvglButton(
-      uiScreen, "Auton", loadAutonScreen, 75, 60, LV_ALIGN_RIGHT_MID, -85, -10);
+      uiScreen, "Auton", loadAutonScreen, 105, 60, LV_ALIGN_RIGHT_MID, -85, -10);
 
   lv_obj_t *diagButton =
-      createLvglButton(uiScreen, "Diagnostics", loadDiagScreen, 75, 60,
+      createLvglButton(uiScreen, "Diagnostics", loadDiagScreen, 105, 60,
                        LV_ALIGN_LEFT_MID, 85, -10);
+  lv_screen_load(uiScreen);
 }
 
 void screeninitBACK(lv_event_t *e) {
