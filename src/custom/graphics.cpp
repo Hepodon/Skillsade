@@ -11,7 +11,6 @@
 #include "pros/screen.hpp"
 #include <cstring>
 
-
 lv_obj_t *autonScreen;
 lv_obj_t *uiScreen;
 lv_obj_t *diagScreen;
@@ -97,8 +96,9 @@ void screeninit() {
   lv_obj_t *title = createLVGLText(uiScreen, "22204W", LV_ALIGN_TOP_MID, 0, 15);
   lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
 
-  lv_obj_t *autonButton = createLvglButton(
-      uiScreen, "Auton", loadAutonScreen, 105, 60, LV_ALIGN_RIGHT_MID, -85, -10);
+  lv_obj_t *autonButton =
+      createLvglButton(uiScreen, "Auton", loadAutonScreen, 105, 60,
+                       LV_ALIGN_RIGHT_MID, -85, -10);
 
   lv_obj_t *diagButton =
       createLvglButton(uiScreen, "Diagnostics", loadDiagScreen, 105, 60,
