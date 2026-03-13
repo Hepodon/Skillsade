@@ -38,7 +38,7 @@ v5::Optical colorSensorScore(0);
 lemlib::Drivetrain DT(&aleft, &aright, 12.72, lemlib::Omniwheel::NEW_325, 450,
                       8);
 
-IMU inertial1(4);
+IMU inertial1(6);
 IMU inertial2(-11);
 
 lemlib::TrackingWheel leftVert(&vertRotation, lemlib::Omniwheel::NEW_2, 0.0, 1);

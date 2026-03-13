@@ -91,7 +91,6 @@ void initialize() {
   chassis.calibrate(true);
   lvgl_init();
   screeninit();
-  Task chartTask(updateChart);
 }
 
 void disabled() {}

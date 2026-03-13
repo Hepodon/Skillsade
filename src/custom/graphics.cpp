@@ -1,6 +1,7 @@
 #include "graphics.hpp"
 #include "autons.hpp"
 #include "liblvgl/core/lv_obj.h"
+#include "liblvgl/core/lv_obj_pos.h"
 #include "liblvgl/core/lv_obj_style_gen.h"
 #include "liblvgl/display/lv_display.h"
 #include "liblvgl/lv_conf_internal.h"
@@ -10,7 +11,6 @@
 #include "portDef.hpp"
 #include "pros/screen.hpp"
 #include <cstring>
-
 
 lv_obj_t *autonScreen;
 lv_obj_t *uiScreen;
@@ -57,13 +57,12 @@ struct Chartseries {
 Chartseries hey;
 
 lv_obj_t *createLVGLChart(Chartseries &stru) {
-  lv_obj_t *chart = lv_chart_create(uiScreen);
+  lv_obj_t *chart = lv_chart_create(diagScreen);
   lv_chart_series_t *headingSeries;
 
   lv_chart_set_type(chart, LV_CHART_TYPE_LINE);
 
   lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -180, 180);
-  lv_chart_set_div_line_count(chart, 20, 180);
 
   lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT);
 
@@ -72,35 +71,47 @@ lv_obj_t *createLVGLChart(Chartseries &stru) {
   headingSeries = lv_chart_add_series(chart, lv_palette_main(LV_PALETTE_RED),
                                       LV_CHART_AXIS_PRIMARY_Y);
 
+  lv_obj_set_size(chart, 400, 200);
+  lv_obj_align(chart, LV_ALIGN_CENTER, 0, 0);
   stru = {chart, headingSeries};
 
   return chart;
 }
-
 void updateChart() {
-  lv_chart_set_next_value(hey.chart, hey.headingSeries,
-                          inertial1.get_heading());
-  lv_chart_refresh(hey.chart);
-  pros::delay(100);
+  double head;
+  while (true) {
+    head = inertial1.get_heading();
+    if (head > 180)
+      head -= 360;
+    lv_chart_set_next_value(hey.chart, hey.headingSeries, head);
+    lv_chart_refresh(hey.chart);
+    pros::delay(100);
+  }
 }
 
 void loadAutonScreen(lv_event_t *e) { lv_screen_load(autonScreen); }
 
-void loadDiagScreen(lv_event_t *e) { lv_screen_load(diagScreen); }
+void screenshot(pros::Task task) { pros::Task suspend(task); }
+void loadDiagScreen(lv_event_t *e) {
+  pros::Task chartTask(updateChart);
+  lv_screen_load(diagScreen);
+}
 
 void screeninit() {
-  lv_obj_t *imuChart = createLVGLChart(hey);
   autonScreen = lv_obj_create(NULL);
   uiScreen = lv_obj_create(NULL);
   diagScreen = lv_obj_create(NULL);
+  lv_obj_t *imuChart = createLVGLChart(hey);
 
   lv_obj_t *title = createLVGLText(uiScreen, "22204W", LV_ALIGN_TOP_MID, 0, 15);
   lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
 
-  lv_obj_t *autonButton = createLvglButton(
-      uiScreen, "Auton", loadAutonScreen, 105, 60, LV_ALIGN_RIGHT_MID, -85, -10);
+  lv_obj_t *autonButton =
+      createLvglButton(uiScreen, "Auton", loadAutonScreen, 105, 60,
+                       LV_ALIGN_RIGHT_MID, -105, -10);
 
   lv_obj_t *diagButton =
       createLvglButton(uiScreen, "Diagnostics", loadDiagScreen, 105, 60,
                        LV_ALIGN_LEFT_MID, 85, -10);
+  lv_screen_load(uiScreen);
 }

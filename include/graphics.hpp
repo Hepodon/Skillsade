@@ -7,3 +7,4 @@
 
 extern void screeninit();
 extern void updateChart();
+extern void screenshot(pros::Task task);
