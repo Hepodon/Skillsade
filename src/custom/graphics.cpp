@@ -22,6 +22,7 @@ lv_obj_t *uiScreen;
 lv_obj_t *diagScreen;
 
 Chartseries heading;
+PositionChart position;
 
 std::vector<pros::Task *> taskList;
 
@@ -58,9 +59,59 @@ void updateHeading(void *param) {
     pros::delay(100);
   }
 }
+double robotX = 0;
+double robotY = 0;
+
 void createHeadingChart() {
   lv_obj_t *headingChart = createLVGLChart(heading, headingScreen);
 }
+lv_obj_t *createPositionChart(PositionChart &stru, lv_obj_t *parent) {
+  lv_obj_t *chart = lv_chart_create(parent);
+
+  lv_chart_set_type(chart, LV_CHART_TYPE_SCATTER);
+
+  // Set your field range (adjust to your robot field size)
+  lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_X, -72, 72);
+  lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -72, 72);
+
+  lv_chart_set_point_count(chart, 1); // ONLY ONE DOT
+
+  lv_chart_series_t *series = lv_chart_add_series(
+      chart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
+
+  lv_obj_set_size(chart, 204, 204);
+  lv_obj_center(chart);
+
+  stru = {chart, series};
+
+  return chart;
+}
+
+void updatePositionChartLVGL(lv_timer_t *timer) {
+  if (position.chart == nullptr || position.series == nullptr)
+    return;
+
+  position.series->x_points[0] = robotX;
+  position.series->y_points[0] = robotY;
+
+  lv_chart_refresh(position.chart);
+}
+pros::Task *positionTask = nullptr;
+lv_obj_t *positionScreen = nullptr;
+void createPositionChartScreen() {
+  createPositionChart(position, positionScreen);
+}
+void updatePosition(void *param) {
+  while (true) {
+    // Example (replace with your actual position system)
+    robotX = 0;
+    robotY = 0;
+
+    pros::delay(100);
+  }
+}
+
+lv_timer_t *positionTimer = nullptr;
 
 lv_obj_t *headingButton;
 lv_obj_t *errorButton;
@@ -89,6 +140,30 @@ void activateHeadingChart(lv_event_t *e) {
 
   lv_screen_load(headingScreen);
   chartTaskManager(headingTask);
+}
+
+void activatePositionChart(lv_event_t *e) {
+  static bool created = false;
+
+  if (!created) {
+    createPositionChartScreen();
+    created = true;
+  }
+
+  if (positionTask == nullptr) {
+    positionTask = new pros::Task(updatePosition, NULL);
+    positionTask->suspend();
+    taskList.push_back(positionTask);
+  }
+
+  if (positionTimer == nullptr) {
+    positionTimer = lv_timer_create(updatePositionChartLVGL, 100, NULL);
+  } else {
+    lv_timer_resume(positionTimer);
+  }
+
+  lv_screen_load(positionScreen);
+  chartTaskManager(positionTask);
 }
 
 int buttonCount = 4;
@@ -125,9 +200,9 @@ void loadDiagScreen(lv_event_t *e) {
         LV_PALETTE_PURPLE, 0);
 
     positionButton = createLvglButton(
-        diagScreen, "Position", nullptr, (screen_width / buttonCount), 60,
-        LV_ALIGN_TOP_LEFT, (3 * (screen_width / buttonCount)), 0,
-        LV_PALETTE_PURPLE, 0);
+        diagScreen, "Position", activatePositionChart,
+        (screen_width / buttonCount), 60, LV_ALIGN_TOP_LEFT,
+        (3 * (screen_width / buttonCount)), 0, LV_PALETTE_PURPLE, 0);
   }
   lv_screen_load_anim(diagScreen, LV_SCR_LOAD_ANIM_MOVE_TOP, 1000, 250, false);
 }
@@ -170,6 +245,7 @@ void screeninit() {
   uiScreen = lv_obj_create(NULL);
   diagScreen = lv_obj_create(NULL);
   headingScreen = lv_obj_create(NULL);
+  positionScreen = lv_obj_create(NULL);
 
   lv_color_t customColor = {60, 29, 40};
 

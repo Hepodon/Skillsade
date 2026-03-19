@@ -19,6 +19,10 @@ struct Chartseries {
   lv_obj_t *chart;
   lv_chart_series_t *headingSeries;
 };
+struct PositionChart {
+  lv_obj_t *chart;
+  lv_chart_series_t *series;
+};
 
 
 extern lv_obj_t *createLvglButton(lv_obj_t *parent, const char *text,
