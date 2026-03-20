@@ -10,20 +10,75 @@
 #include "liblvgl/misc/lv_area.h"
 #include "liblvgl/misc/lv_color.h"
 #include "liblvgl/misc/lv_palette.h"
+#include "liblvgl/widgets/arc/lv_arc.h"
 #include "liblvgl/widgets/chart/lv_chart.h"
 #include "lvgl_Customs.hpp"
+#include "main.h"
 #include "portDef.hpp"
+#include "pros/abstract_motor.hpp"
+#include "pros/motors.h"
 #include "pros/screen.hpp"
 #include <cstring>
 #include <functional>
 
+int loadtime = 500;
+
 lv_obj_t *autonScreen;
 lv_obj_t *uiScreen;
 lv_obj_t *diagScreen;
+lv_color_t customColor = {60, 29, 40};
+int motorCount = sizeof(motorPorts) / sizeof(motorPorts[0]);
+std::vector<lv_obj_t *> arcs(motorCount, nullptr);
 
 Chartseries heading;
-PositionChart position;
+customChart position;
+void activateHeadingChart(lv_event_t *e);
+void activatePositionChart(lv_event_t *e);
+void loadTempScreen(lv_event_t *e);
+void uiScreenloader(lv_event_t *e);
 
+int buttonCount = 5;
+int screen_width = 480;
+
+lv_obj_t *leftAutonButton;
+lv_obj_t *rightAutonButton;
+lv_obj_t *rightSoloAutonButton;
+lv_obj_t *SkillsAutonButton;
+lv_obj_t *backButton;
+lv_obj_t *title;
+lv_obj_t *headingButton;
+lv_obj_t *errorButton;
+lv_obj_t *positionButton;
+lv_obj_t *backDiagButton;
+lv_obj_t *tempButton;
+
+void createNavBar(lv_obj_t *parent) {
+  lv_obj_set_style_bg_color(parent, customColor, 0);
+  backDiagButton = createLvglButton(
+      parent, "<", uiScreenloader, (screen_width / buttonCount), 30,
+      LV_ALIGN_TOP_LEFT, (0 * (screen_width / buttonCount)), 0,
+      LV_PALETTE_PURPLE, 0);
+
+  headingButton = createLvglButton(
+      parent, "Heading", activateHeadingChart, (screen_width / buttonCount), 30,
+      LV_ALIGN_TOP_LEFT, (1 * (screen_width / buttonCount)), 0,
+      LV_PALETTE_PURPLE, 0);
+
+  errorButton = createLvglButton(
+      parent, "Error", nullptr, (screen_width / buttonCount), 30,
+      LV_ALIGN_TOP_LEFT, (2 * (screen_width / buttonCount)), 0,
+      LV_PALETTE_PURPLE, 0);
+
+  positionButton = createLvglButton(
+      parent, "Position", activatePositionChart, (screen_width / buttonCount),
+      30, LV_ALIGN_TOP_LEFT, (3 * (screen_width / buttonCount)), 0,
+      LV_PALETTE_PURPLE, 0);
+
+  tempButton = createLvglButton(
+      parent, "temp", loadTempScreen, (screen_width / buttonCount), 30,
+      LV_ALIGN_TOP_LEFT, (4 * (screen_width / buttonCount)), 0,
+      LV_PALETTE_PURPLE, 0);
+}
 std::vector<pros::Task *> taskList;
 
 void chartTaskManager(pros::Task *activeTask) {
@@ -44,9 +99,13 @@ void updateChartLVGL(lv_timer_t *timer) {
 }
 
 pros::Task *headingTask = nullptr;
+pros::Task *positionTask = nullptr;
+pros::Task *tempTask = nullptr;
 lv_obj_t *headingScreen = nullptr;
+lv_obj_t *tempScreen = nullptr;
 
 lv_timer_t *headingTimer = nullptr;
+lv_timer_t *tempTimer = nullptr;
 
 void updateHeading(void *param) {
   while (true) {
@@ -59,28 +118,138 @@ void updateHeading(void *param) {
     pros::delay(100);
   }
 }
+void updateTemp(void *param) {
+  while (true) {
+    for (int i = 0; i < 9; i++) {
+      motorPorts[i][1] = pros::c::motor_get_temperature(i);
+    }
+    pros::delay(15);
+  }
+}
+
+void updateTempArc(lv_timer_t *timer) {
+  for (int i = 0; i < 9; i++) {
+    lv_arc_set_value(arcs[i], motorPorts[i][1]);
+    lv_chart_refresh(heading.chart);
+  }
+}
+
+void updateTorque() {
+  while (true) {
+    for (int i = 0; i < 9; i++) {
+      motorPorts[i][2] = pros::c::motor_get_torque(i);
+    }
+    pros::delay(15);
+  }
+}
+
+void update_arc_color(lv_obj_t *arc, int value, int maxValue) {
+  lv_color_t color;
+  color = lv_palette_main(value > maxValue * 0.85   ? LV_PALETTE_RED
+                          : value > maxValue * 0.75 ? LV_PALETTE_DEEP_ORANGE
+                          : value > maxValue * 0.65 ? LV_PALETTE_ORANGE
+                          : value > maxValue * 0.50 ? LV_PALETTE_YELLOW
+                          : value > maxValue * 0.35 ? LV_PALETTE_GREEN
+                                                    : LV_PALETTE_BLUE);
+
+  lv_obj_set_style_arc_color(arc, color, LV_PART_INDICATOR);
+}
+
+void createTempArcs() {
+
+  for (int i = 0; i < motorCount; i++) {
+
+    arcs[i] = lv_arc_create(tempScreen);
+
+    lv_obj_set_size(arcs[i], 90, 90);
+
+    lv_arc_set_range(arcs[i], 0, 100);
+
+    lv_arc_set_rotation(arcs[i], 180);
+
+    lv_arc_set_bg_angles(arcs[i], 30, 150);
+
+    lv_arc_set_value(arcs[i], i * 11);
+
+    lv_obj_remove_style(arcs[i], NULL, LV_PART_KNOB);
+
+    lv_obj_remove_flag(arcs[i], LV_OBJ_FLAG_CLICKABLE);
+
+    update_arc_color(arcs[i], lv_arc_get_value(arcs[i]),
+                     lv_arc_get_max_value(arcs[i]));
+
+    std::string position;
+
+    if (i < 6) {
+      position = "CHASSIS";
+    } else if (i == 6) {
+      position = "INTAKE";
+    } else if (i == 7) {
+      position = "HOOD";
+    } else if (i == 8) {
+      position = "MIDDLE";
+    }
+
+    if (i < 5) {
+      lv_obj_align(arcs[i], LV_ALIGN_BOTTOM_LEFT, 4 + (96 * i),
+                   -(242 / 2) + 15);
+    } else if (i < 10) {
+      lv_obj_align(arcs[i], LV_ALIGN_BOTTOM_LEFT, 4 + (96 * (i - 5)), -15);
+    }
+    lv_obj_t *label = lv_label_create(arcs[i]);
+    lv_label_set_text_fmt(label, "Port: %d",
+                          static_cast<int>(motorPorts[i][0]));
+    lv_obj_center(label);
+    lv_obj_t *name = lv_label_create(arcs[i]);
+    lv_label_set_text_fmt(name, "%s", position.c_str());
+    lv_obj_align(name, LV_ALIGN_CENTER, 0, 15);
+  }
+}
+
+void loadTempScreen(lv_event_t *e) {
+  createNavBar(tempScreen);
+
+  lv_obj_set_style_bg_grad_color(tempScreen, customColor, 0);
+  createTempArcs();
+
+  if (tempTask == nullptr) {
+    tempTask = new pros::Task(updateTemp, NULL);
+    tempTask->suspend();
+    taskList.push_back(tempTask);
+  }
+
+  if (tempTimer == nullptr) {
+    tempTimer = lv_timer_create(updateChartLVGL, 100, NULL);
+  } else {
+    lv_timer_resume(headingTimer);
+  }
+
+  lv_screen_load(tempScreen);
+  chartTaskManager(tempTask);
+}
+
 double robotX = 0;
 double robotY = 0;
 
 void createHeadingChart() {
   lv_obj_t *headingChart = createLVGLChart(heading, headingScreen);
+  lv_obj_align(headingChart, LV_ALIGN_CENTER, 0, 16);
 }
-lv_obj_t *createPositionChart(PositionChart &stru, lv_obj_t *parent) {
+lv_obj_t *createPositionChart(customChart &stru, lv_obj_t *parent) {
   lv_obj_t *chart = lv_chart_create(parent);
 
   lv_chart_set_type(chart, LV_CHART_TYPE_SCATTER);
 
-  // Set your field range (adjust to your robot field size)
   lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_X, -72, 72);
   lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -72, 72);
 
-  lv_chart_set_point_count(chart, 1); // ONLY ONE DOT
+  lv_chart_set_point_count(chart, 1);
 
   lv_chart_series_t *series = lv_chart_add_series(
       chart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
 
   lv_obj_set_size(chart, 204, 204);
-  lv_obj_center(chart);
+  lv_obj_align(chart, LV_ALIGN_LEFT_MID, 15, 16);
 
   stru = {chart, series};
 
@@ -96,14 +265,12 @@ void updatePositionChartLVGL(lv_timer_t *timer) {
 
   lv_chart_refresh(position.chart);
 }
-pros::Task *positionTask = nullptr;
 lv_obj_t *positionScreen = nullptr;
 void createPositionChartScreen() {
   createPositionChart(position, positionScreen);
 }
 void updatePosition(void *param) {
   while (true) {
-    // Example (replace with your actual position system)
     robotX = 0;
     robotY = 0;
 
@@ -113,13 +280,9 @@ void updatePosition(void *param) {
 
 lv_timer_t *positionTimer = nullptr;
 
-lv_obj_t *headingButton;
-lv_obj_t *errorButton;
-lv_obj_t *positionButton;
-lv_obj_t *backDiagButton;
-
 void activateHeadingChart(lv_event_t *e) {
   static bool chartCreated = false;
+  createNavBar(headingScreen);
 
   if (!chartCreated) {
     createHeadingChart();
@@ -143,6 +306,8 @@ void activateHeadingChart(lv_event_t *e) {
 }
 
 void activatePositionChart(lv_event_t *e) {
+  createNavBar(positionScreen);
+
   static bool created = false;
 
   if (!created) {
@@ -162,12 +327,11 @@ void activatePositionChart(lv_event_t *e) {
     lv_timer_resume(positionTimer);
   }
 
+  lv_obj_set_style_bg_grad_color(positionScreen, customColor, 0);
+
   lv_screen_load(positionScreen);
   chartTaskManager(positionTask);
 }
-
-int buttonCount = 4;
-int screen_width = 480;
 
 void uiScreenloader(lv_event_t *e) {
   chartTaskManager(nullptr);
@@ -176,43 +340,15 @@ void uiScreenloader(lv_event_t *e) {
     lv_timer_pause(headingTimer);
   }
 
-  lv_screen_load_anim(uiScreen, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, 1000, 250, false);
+  lv_screen_load_anim(uiScreen, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, loadtime, 250,
+                      false);
 }
+
 void loadDiagScreen(lv_event_t *e) {
-  static bool diagInitialized = false;
-
-  if (!diagInitialized) {
-    diagInitialized = true;
-
-    backDiagButton = createLvglButton(
-        diagScreen, "<", uiScreenloader, (screen_width / buttonCount), 60,
-        LV_ALIGN_TOP_LEFT, (0 * (screen_width / buttonCount)), 0,
-        LV_PALETTE_PURPLE, 0);
-
-    headingButton = createLvglButton(
-        diagScreen, "Heading", activateHeadingChart,
-        (screen_width / buttonCount), 60, LV_ALIGN_TOP_LEFT,
-        (1 * (screen_width / buttonCount)), 0, LV_PALETTE_PURPLE, 0);
-
-    errorButton = createLvglButton(
-        diagScreen, "Error", nullptr, (screen_width / buttonCount), 60,
-        LV_ALIGN_TOP_LEFT, (2 * (screen_width / buttonCount)), 0,
-        LV_PALETTE_PURPLE, 0);
-
-    positionButton = createLvglButton(
-        diagScreen, "Position", activatePositionChart,
-        (screen_width / buttonCount), 60, LV_ALIGN_TOP_LEFT,
-        (3 * (screen_width / buttonCount)), 0, LV_PALETTE_PURPLE, 0);
-  }
-  lv_screen_load_anim(diagScreen, LV_SCR_LOAD_ANIM_MOVE_TOP, 1000, 250, false);
+  createNavBar(diagScreen);
+  lv_screen_load_anim(diagScreen, LV_SCR_LOAD_ANIM_MOVE_TOP, loadtime, 250,
+                      false);
 }
-
-lv_obj_t *leftAutonButton;
-lv_obj_t *rightAutonButton;
-lv_obj_t *rightSoloAutonButton;
-lv_obj_t *SkillsAutonButton;
-lv_obj_t *backButton;
-lv_obj_t *title;
 
 void loadAutonScreen(lv_event_t *e) {
   title = createLVGLText(autonScreen, "22204W Auton", LV_ALIGN_TOP_MID, 0, 6);
@@ -237,7 +373,8 @@ void loadAutonScreen(lv_event_t *e) {
                        LV_ALIGN_CENTER, 0, 60, LV_PALETTE_PURPLE);
 
   lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
-  lv_screen_load_anim(autonScreen, LV_SCR_LOAD_ANIM_MOVE_TOP, 1000, 250, false);
+  lv_screen_load_anim(autonScreen, LV_SCR_LOAD_ANIM_MOVE_TOP, loadtime, 250,
+                      false);
 }
 
 void screeninit() {
@@ -246,10 +383,7 @@ void screeninit() {
   diagScreen = lv_obj_create(NULL);
   headingScreen = lv_obj_create(NULL);
   positionScreen = lv_obj_create(NULL);
-
-  lv_color_t customColor = {60, 29, 40};
-
-  // lv_obj_set_style_bg_grad_color(uiScreen, customColor, 0);
+  tempScreen = lv_obj_create(NULL);
 
   lv_obj_set_style_bg_color(uiScreen, customColor, 0);
   lv_obj_set_style_bg_color(autonScreen, customColor, 0);
@@ -264,5 +398,6 @@ void screeninit() {
   lv_obj_t *diagButton =
       createLvglButton(uiScreen, "Diagnostics", loadDiagScreen, 105, 60,
                        LV_ALIGN_LEFT_MID, 85, -10, LV_PALETTE_PURPLE);
-  lv_screen_load_anim(uiScreen, LV_SCR_LOAD_ANIM_OUT_TOP, 1750, 250, false);
+  lv_screen_load_anim(uiScreen, LV_SCR_LOAD_ANIM_OUT_TOP, loadtime * 1.25, 250,
+                      false);
 }

@@ -19,7 +19,7 @@ struct Chartseries {
   lv_obj_t *chart;
   lv_chart_series_t *headingSeries;
 };
-struct PositionChart {
+struct customChart {
   lv_obj_t *chart;
   lv_chart_series_t *series;
 };
