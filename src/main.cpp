@@ -6,6 +6,7 @@
 #include "liblvgl/misc/lv_types.h"
 #include "mcl.hpp"
 #include "portDef.hpp"
+#include "pros/motors.h"
 #include "pros/screen.hpp"
 #include <cmath>
 #include <cstdio>
@@ -115,6 +116,9 @@ void opcontrol() {
 
     applyButtons(userInput);
 
+    for (int i = 0; i < 9; i++) {
+      pros::c::motor_move(motorPorts[i][0], 127);
+    }
     // Apply controller input for movement using split arcade controls
     chassis.arcade(leftY, rightX, true, 0.40);
 
