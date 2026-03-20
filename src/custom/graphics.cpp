@@ -22,10 +22,14 @@
 #include <functional>
 
 int loadtime = 500;
-
+enum ScreenState { UI, HEADING, POSITION, TEMP, TORQUE };
+ScreenState currentScreen;
 lv_obj_t *autonScreen;
 lv_obj_t *uiScreen;
 lv_obj_t *diagScreen;
+lv_obj_t *headingScreen = nullptr;
+lv_obj_t *positionScreen = nullptr;
+lv_obj_t *tempScreen = nullptr;
 lv_color_t customColor = {60, 29, 40};
 int motorCount = sizeof(motorPorts) / sizeof(motorPorts[0]);
 std::vector<lv_obj_t *> arcs(motorCount, nullptr);
@@ -52,97 +56,6 @@ lv_obj_t *positionButton;
 lv_obj_t *backDiagButton;
 lv_obj_t *tempButton;
 
-void createNavBar(lv_obj_t *parent) {
-  lv_obj_set_style_bg_color(parent, customColor, 0);
-  backDiagButton = createLvglButton(
-      parent, "<", uiScreenloader, (screen_width / buttonCount), 30,
-      LV_ALIGN_TOP_LEFT, (0 * (screen_width / buttonCount)), 0,
-      LV_PALETTE_PURPLE, 0);
-
-  headingButton = createLvglButton(
-      parent, "Heading", activateHeadingChart, (screen_width / buttonCount), 30,
-      LV_ALIGN_TOP_LEFT, (1 * (screen_width / buttonCount)), 0,
-      LV_PALETTE_PURPLE, 0);
-
-  errorButton = createLvglButton(
-      parent, "Error", nullptr, (screen_width / buttonCount), 30,
-      LV_ALIGN_TOP_LEFT, (2 * (screen_width / buttonCount)), 0,
-      LV_PALETTE_PURPLE, 0);
-
-  positionButton = createLvglButton(
-      parent, "Position", activatePositionChart, (screen_width / buttonCount),
-      30, LV_ALIGN_TOP_LEFT, (3 * (screen_width / buttonCount)), 0,
-      LV_PALETTE_PURPLE, 0);
-
-  tempButton = createLvglButton(
-      parent, "temp", loadTempScreen, (screen_width / buttonCount), 30,
-      LV_ALIGN_TOP_LEFT, (4 * (screen_width / buttonCount)), 0,
-      LV_PALETTE_PURPLE, 0);
-}
-std::vector<pros::Task *> taskList;
-
-void chartTaskManager(pros::Task *activeTask) {
-  for (auto task : taskList) {
-    if (task == activeTask && task != nullptr) {
-      task->resume();
-    } else if (task != nullptr) {
-      task->suspend();
-    }
-  }
-}
-
-double headingValue = 0;
-
-void updateChartLVGL(lv_timer_t *timer) {
-  lv_chart_set_next_value(heading.chart, heading.headingSeries, headingValue);
-  lv_chart_refresh(heading.chart);
-}
-
-pros::Task *headingTask = nullptr;
-pros::Task *positionTask = nullptr;
-pros::Task *tempTask = nullptr;
-lv_obj_t *headingScreen = nullptr;
-lv_obj_t *tempScreen = nullptr;
-
-lv_timer_t *headingTimer = nullptr;
-lv_timer_t *tempTimer = nullptr;
-
-void updateHeading(void *param) {
-  while (true) {
-    double head = inertial1.get_heading();
-    if (head > 180)
-      head -= 360;
-
-    headingValue = head;
-
-    pros::delay(100);
-  }
-}
-void updateTemp(void *param) {
-  while (true) {
-    for (int i = 0; i < 9; i++) {
-      motorPorts[i][1] = pros::c::motor_get_temperature(i);
-    }
-    pros::delay(15);
-  }
-}
-
-void updateTempArc(lv_timer_t *timer) {
-  for (int i = 0; i < 9; i++) {
-    lv_arc_set_value(arcs[i], motorPorts[i][1]);
-    lv_chart_refresh(heading.chart);
-  }
-}
-
-void updateTorque() {
-  while (true) {
-    for (int i = 0; i < 9; i++) {
-      motorPorts[i][2] = pros::c::motor_get_torque(i);
-    }
-    pros::delay(15);
-  }
-}
-
 void update_arc_color(lv_obj_t *arc, int value, int maxValue) {
   lv_color_t color;
   color = lv_palette_main(value > maxValue * 0.85   ? LV_PALETTE_RED
@@ -155,6 +68,105 @@ void update_arc_color(lv_obj_t *arc, int value, int maxValue) {
   lv_obj_set_style_arc_color(arc, color, LV_PART_INDICATOR);
 }
 
+void createNavBar(lv_obj_t *parent) {
+  lv_obj_set_style_bg_color(parent, customColor, 0);
+
+  backDiagButton = createLvglButton(
+      parent, "<", uiScreenloader, (screen_width / buttonCount), 30,
+      LV_ALIGN_TOP_LEFT, (0 * (screen_width / buttonCount)), 0,
+      LV_PALETTE_PURPLE, 0);
+
+  if (parent != headingScreen) {
+    headingButton = createLvglButton(
+        parent, "Heading", activateHeadingChart, (screen_width / buttonCount),
+        30, LV_ALIGN_TOP_LEFT, (1 * (screen_width / buttonCount)), 0,
+        LV_PALETTE_PURPLE, 0);
+  } else {
+    headingButton = createLvglButton(
+        parent, "Heading", activateHeadingChart, (screen_width / buttonCount),
+        30, LV_ALIGN_TOP_LEFT, (1 * (screen_width / buttonCount)), 0,
+        LV_PALETTE_DEEP_PURPLE, 0);
+  }
+
+  errorButton = createLvglButton(
+      parent, "Error", nullptr, (screen_width / buttonCount), 30,
+      LV_ALIGN_TOP_LEFT, (2 * (screen_width / buttonCount)), 0,
+      LV_PALETTE_PURPLE, 0);
+
+  if (parent != positionScreen) {
+    positionButton = createLvglButton(
+        parent, "Position", activatePositionChart, (screen_width / buttonCount),
+        30, LV_ALIGN_TOP_LEFT, (3 * (screen_width / buttonCount)), 0,
+        LV_PALETTE_PURPLE, 0);
+  } else {
+    positionButton = createLvglButton(
+        parent, "Position", activatePositionChart, (screen_width / buttonCount),
+        30, LV_ALIGN_TOP_LEFT, (3 * (screen_width / buttonCount)), 0,
+        LV_PALETTE_DEEP_PURPLE, 0);
+  }
+  if (parent != tempScreen) {
+    tempButton = createLvglButton(
+        parent, "temp", loadTempScreen, (screen_width / buttonCount), 30,
+        LV_ALIGN_TOP_LEFT, (4 * (screen_width / buttonCount)), 0,
+        LV_PALETTE_PURPLE, 0);
+  } else {
+    tempButton = createLvglButton(
+        parent, "temp", loadTempScreen, (screen_width / buttonCount), 30,
+        LV_ALIGN_TOP_LEFT, (4 * (screen_width / buttonCount)), 0,
+        LV_PALETTE_DEEP_PURPLE, 0);
+  }
+}
+
+double robot_X = 0;
+double robot_Orientation = 0;
+double robot_Y = 0;
+
+double headingValue = 0;
+
+void updateChartLVGL(lv_timer_t *timer) {
+  lv_chart_set_next_value(heading.chart, heading.headingSeries, headingValue);
+  lv_chart_refresh(heading.chart);
+}
+
+lv_timer_t *headingTimer = nullptr;
+lv_timer_t *tempTimer = nullptr;
+
+void masterUpdateTask() {
+  while (true) {
+
+    if (currentScreen == HEADING || currentScreen == POSITION) {
+      double head = inertial1.get_heading();
+      if (head > 180)
+        head -= 360;
+      headingValue = head;
+    } else if (currentScreen == TEMP) {
+      for (int i = 0; i < motorCount; i++) {
+        motorPorts[i][1] = pros::c::motor_get_temperature(motorPorts[i][0]);
+      }
+    } else if (currentScreen == TORQUE) {
+      for (int i = 0; i < motorCount; i++) {
+        motorPorts[i][2] = pros::c::motor_get_torque(motorPorts[i][0]);
+      }
+    } else if (currentScreen == POSITION) {
+      robot_X = chassis.getPose().x;
+      robot_Y = chassis.getPose().y;
+      robot_Orientation = chassis.getPose(true).theta;
+    }
+
+    pros::delay(5);
+  }
+}
+
+pros::Task masterTask(masterUpdateTask);
+
+void updateTempArc(lv_timer_t *timer) {
+  for (int i = 0; i < 9; i++) {
+    int val = motorPorts[i][1];
+    lv_arc_set_value(arcs[i], val);
+    update_arc_color(arcs[i], val, lv_arc_get_max_value(arcs[i]));
+  }
+}
+
 void createTempArcs() {
 
   for (int i = 0; i < motorCount; i++) {
@@ -163,7 +175,7 @@ void createTempArcs() {
 
     lv_obj_set_size(arcs[i], 90, 90);
 
-    lv_arc_set_range(arcs[i], 0, 100);
+    lv_arc_set_range(arcs[i], 20, 62);
 
     lv_arc_set_rotation(arcs[i], 180);
 
@@ -210,26 +222,23 @@ void loadTempScreen(lv_event_t *e) {
   createNavBar(tempScreen);
 
   lv_obj_set_style_bg_grad_color(tempScreen, customColor, 0);
-  createTempArcs();
 
-  if (tempTask == nullptr) {
-    tempTask = new pros::Task(updateTemp, NULL);
-    tempTask->suspend();
-    taskList.push_back(tempTask);
+  static bool created = false;
+
+  if (!created) {
+    createTempArcs();
+    created = true;
   }
 
   if (tempTimer == nullptr) {
-    tempTimer = lv_timer_create(updateChartLVGL, 100, NULL);
+    tempTimer = lv_timer_create(updateTempArc, 100, NULL);
   } else {
-    lv_timer_resume(headingTimer);
+    lv_timer_resume(tempTimer);
   }
 
+  currentScreen = TEMP;
   lv_screen_load(tempScreen);
-  chartTaskManager(tempTask);
 }
-
-double robotX = 0;
-double robotY = 0;
 
 void createHeadingChart() {
   lv_obj_t *headingChart = createLVGLChart(heading, headingScreen);
@@ -260,22 +269,13 @@ void updatePositionChartLVGL(lv_timer_t *timer) {
   if (position.chart == nullptr || position.series == nullptr)
     return;
 
-  position.series->x_points[0] = robotX;
-  position.series->y_points[0] = robotY;
+  position.series->x_points[0] = robot_X;
+  position.series->y_points[0] = robot_Y;
 
   lv_chart_refresh(position.chart);
 }
-lv_obj_t *positionScreen = nullptr;
 void createPositionChartScreen() {
   createPositionChart(position, positionScreen);
-}
-void updatePosition(void *param) {
-  while (true) {
-    robotX = 0;
-    robotY = 0;
-
-    pros::delay(100);
-  }
 }
 
 lv_timer_t *positionTimer = nullptr;
@@ -289,20 +289,14 @@ void activateHeadingChart(lv_event_t *e) {
     chartCreated = true;
   }
 
-  if (headingTask == nullptr) {
-    headingTask = new pros::Task(updateHeading, NULL);
-    headingTask->suspend();
-    taskList.push_back(headingTask);
-  }
-
   if (headingTimer == nullptr) {
     headingTimer = lv_timer_create(updateChartLVGL, 100, NULL);
   } else {
     lv_timer_resume(headingTimer);
   }
 
+  currentScreen = HEADING;
   lv_screen_load(headingScreen);
-  chartTaskManager(headingTask);
 }
 
 void activatePositionChart(lv_event_t *e) {
@@ -315,12 +309,6 @@ void activatePositionChart(lv_event_t *e) {
     created = true;
   }
 
-  if (positionTask == nullptr) {
-    positionTask = new pros::Task(updatePosition, NULL);
-    positionTask->suspend();
-    taskList.push_back(positionTask);
-  }
-
   if (positionTimer == nullptr) {
     positionTimer = lv_timer_create(updatePositionChartLVGL, 100, NULL);
   } else {
@@ -329,23 +317,24 @@ void activatePositionChart(lv_event_t *e) {
 
   lv_obj_set_style_bg_grad_color(positionScreen, customColor, 0);
 
+  currentScreen = POSITION;
   lv_screen_load(positionScreen);
-  chartTaskManager(positionTask);
 }
 
 void uiScreenloader(lv_event_t *e) {
-  chartTaskManager(nullptr);
 
   if (headingTimer != nullptr) {
     lv_timer_pause(headingTimer);
   }
 
+  currentScreen = UI;
   lv_screen_load_anim(uiScreen, LV_SCR_LOAD_ANIM_MOVE_BOTTOM, loadtime, 250,
                       false);
 }
 
 void loadDiagScreen(lv_event_t *e) {
   createNavBar(diagScreen);
+  currentScreen = UI;
   lv_screen_load_anim(diagScreen, LV_SCR_LOAD_ANIM_MOVE_TOP, loadtime, 250,
                       false);
 }
@@ -384,6 +373,7 @@ void screeninit() {
   headingScreen = lv_obj_create(NULL);
   positionScreen = lv_obj_create(NULL);
   tempScreen = lv_obj_create(NULL);
+  currentScreen = UI;
 
   lv_obj_set_style_bg_color(uiScreen, customColor, 0);
   lv_obj_set_style_bg_color(autonScreen, customColor, 0);
