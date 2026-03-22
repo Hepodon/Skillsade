@@ -276,13 +276,25 @@ void turnPIDTunerTask(void *) {
   }
 }
 
-void updatePIDText(lv_timer_t *timer) {
+void updatePIDTextp(lv_timer_t *timer) {
   char buf[32];
 
   snprintf(buf, sizeof(buf), "kp: %.5f", t_kp);
   lv_label_set_text((lv_obj_t *)timer->user_data, buf);
 }
 
+void updatePIDTexti(lv_timer_t *timer) {
+  char buf[32];
+
+  snprintf(buf, sizeof(buf), "ki: %.5f", t_ki);
+  lv_label_set_text((lv_obj_t *)timer->user_data, buf);
+}
+void updatePIDTextd(lv_timer_t *timer) {
+  char buf[32];
+
+  snprintf(buf, sizeof(buf), "kd: %.5f", t_kd);
+  lv_label_set_text((lv_obj_t *)timer->user_data, buf);
+}
 void createNavBar(lv_obj_t *parent) {
   lv_obj_set_style_bg_color(parent, customColor, 0);
 
@@ -609,7 +621,9 @@ void loadTurnPID(lv_event_t *e) {
   lv_obj_t *ki = createLVGLText(turnPIDScreen, nullptr, LV_ALIGN_CENTER, 0, 0);
   lv_obj_t *kd = createLVGLText(turnPIDScreen, nullptr, LV_ALIGN_CENTER, 0, 30);
   static pros::Task tunerTask(turnPIDTunerTask);
-  lv_timer_create(updatePIDText, 100, NULL);
+  lv_timer_create(updatePIDTextp, 100, kp);
+  lv_timer_create(updatePIDTexti, 100, ki);
+  lv_timer_create(updatePIDTextd, 100, kd);
 
   lv_screen_load_anim(turnPIDScreen, LV_SCR_LOAD_ANIM_FADE_IN, loadtime, 100,
                       false);
@@ -641,7 +655,7 @@ void loadAutoPIDScreen(lv_event_t *e) {
   l_kd = lateral_controller.kD;
 
   lv_obj_t *title =
-      createLVGLText(autoPIDButton, "Auto PID Tuner", LV_ALIGN_TOP_MID, 0, 5);
+      createLVGLText(autoPIDScreen, "Auto PID Tuner", LV_ALIGN_TOP_MID, 0, 5);
 
   turnPIDButton = createLvglButton(autoPIDScreen, "Turn", loadTurnPID, 85, 75,
                                    LV_ALIGN_CENTER, -50, 5);
