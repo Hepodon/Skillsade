@@ -28,7 +28,7 @@ struct customChart {
 extern lv_obj_t *createLvglButton(lv_obj_t *parent, const char *text,
                                   lv_event_cb_t event_cb, int width, int height,
                                   lv_align_t align, int x_ofs, int y_ofs,
-                                  lv_palette_t color = LV_PALETTE_DEEP_PURPLE,
+                                  lv_palette_t color = LV_PALETTE_PURPLE,
                                   int radius = 20);
 extern lv_obj_t *createLVGLText(lv_obj_t *parent, const char *text,
                                 lv_align_t align, int x_ofs, int y_ofs);

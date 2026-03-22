@@ -11,6 +11,7 @@
 #include "liblvgl/misc/lv_area.h"
 #include "liblvgl/misc/lv_color.h"
 #include "liblvgl/misc/lv_palette.h"
+#include "liblvgl/misc/lv_timer.h"
 #include "liblvgl/widgets/arc/lv_arc.h"
 #include "liblvgl/widgets/chart/lv_chart.h"
 #include "lvgl_Customs.hpp"
@@ -22,11 +23,22 @@
 #include <cstring>
 #include <functional>
 
+float t_kp;
+float t_ki;
+float t_kd;
+
+float l_kp;
+float l_ki;
+float l_kd;
+
 int loadtime = 500;
 enum ScreenState { UI, HEADING, POSITION, TEMP, TORQUE };
 ScreenState currentScreen;
 lv_obj_t *autonScreen;
 lv_obj_t *uiScreen;
+lv_obj_t *autoPIDScreen;
+lv_obj_t *turnPIDScreen;
+lv_obj_t *latPIDScreen;
 lv_obj_t *diagScreen;
 lv_obj_t *headingScreen = nullptr;
 lv_obj_t *positionScreen = nullptr;
@@ -39,6 +51,7 @@ std::vector<lv_obj_t *> torqueArcs(motorCount, nullptr);
 
 Chartseries heading;
 customChart position;
+
 void activateHeadingChart(lv_event_t *e);
 void activatePositionChart(lv_event_t *e);
 void loadTempScreen(lv_event_t *e);
@@ -50,6 +63,9 @@ int screen_width = 480;
 
 lv_obj_t *leftAutonButton;
 lv_obj_t *rightAutonButton;
+lv_obj_t *autoPIDButton;
+lv_obj_t *turnPIDButton;
+lv_obj_t *latPIDButton;
 lv_obj_t *rightSoloAutonButton;
 lv_obj_t *SkillsAutonButton;
 lv_obj_t *backButton;
@@ -123,6 +139,149 @@ void refreshNavBar(lv_obj_t *parent) {
       },
       40, 30, LV_ALIGN_RIGHT_MID, 0, 0, LV_PALETTE_PURPLE, 0);
 }
+bool tuningActive = false;
+
+float wrapError(float target, float current) {
+  float error = target - current;
+  if (error > 180)
+    error -= 360;
+  if (error < -180)
+    error += 360;
+  return error;
+}
+
+float lastScore = 1e9;
+int stagnantRuns = 0;
+int goodRuns = 0;
+int totalRuns;
+
+void turnPIDTunerTask(void *) {
+  tuningActive = true;
+
+  while (tuningActive) {
+
+    float target = 15 + (rand() % 165);
+
+    float maxError = 0;
+    float lastError = 0;
+    float steadyStateError = 0;
+    int zeroCrossings = 0;
+    int settleTime = 0;
+
+    bool settled = false;
+    bool first = true;
+    bool lastSign = false;
+
+    chassis.turnToHeading(target, 2000, {}, false);
+
+    int startTime = pros::millis();
+
+    while (true) {
+      float current = inertial1.get_heading();
+      float error = wrapError(target, current);
+      float absError = fabs(error);
+
+      if (absError > maxError) {
+        maxError = absError;
+      }
+
+      bool sign = error > 0;
+      if (!first && sign != lastSign) {
+        zeroCrossings++;
+      }
+      lastSign = sign;
+      first = false;
+
+      int settleStart = -1;
+
+      if (absError < 1.0) {
+        if (settleStart == -1) {
+          settleStart = pros::millis();
+        }
+
+        if (pros::millis() - settleStart > 150) {
+          settled = true;
+          settleTime = pros::millis() - startTime;
+        }
+      } else {
+        settleStart = -1;
+      }
+
+      lastError = absError;
+
+      if ((pros::millis() - startTime > 2000) || settled) {
+        break;
+      }
+
+      pros::delay(10);
+    }
+
+    steadyStateError = lastError;
+
+    if (steadyStateError > 3) {
+      float factor = std::clamp(steadyStateError / 10.0f, 1.05f, 1.2f);
+      angular_controller.kP *= factor;
+    } else if (maxError > 25) {
+      angular_controller.kP *= 0.9;
+    }
+
+    if (zeroCrossings > 4) {
+      float factor = std::clamp(zeroCrossings / 4.0f, 1.1f, 1.5f);
+      angular_controller.kD *= factor;
+    } else if (zeroCrossings == 0 && maxError < 10) {
+      angular_controller.kD *= 0.95;
+    }
+
+    if (settleTime > 1200) {
+      angular_controller.kP *= 1.05;
+    }
+
+    angular_controller.kP = std::clamp(angular_controller.kP, 0.1f, 20.0f);
+    angular_controller.kD = std::clamp(angular_controller.kD, 0.0f, 10.0f);
+
+    t_kp = angular_controller.kP;
+    t_kd = angular_controller.kD;
+
+    float score = settleTime + (maxError * 5) + (steadyStateError * 10) +
+                  (zeroCrossings * 100);
+
+    if (fabs(score - lastScore) < 5.0) {
+      stagnantRuns++;
+    } else {
+      stagnantRuns = 0;
+    }
+
+    bool meetsCriteria;
+
+    if (steadyStateError < 1.0 && maxError < 15 && settleTime < 800 &&
+        zeroCrossings <= 2) {
+      meetsCriteria = true;
+    } else {
+      meetsCriteria = false;
+    }
+
+    if (meetsCriteria) {
+      goodRuns++;
+    } else {
+      goodRuns = 0;
+    }
+
+    lastScore = score;
+
+    if ((goodRuns >= 5 || stagnantRuns >= 5) && totalRuns > 10) {
+      tuningActive = false;
+    }
+    totalRuns++;
+    pros::delay(300);
+  }
+}
+
+void updatePIDText(lv_timer_t *timer) {
+  char buf[32];
+
+  snprintf(buf, sizeof(buf), "kp: %.5f", t_kp);
+  lv_label_set_text((lv_obj_t *)timer->user_data, buf);
+}
 
 void createNavBar(lv_obj_t *parent) {
   lv_obj_set_style_bg_color(parent, customColor, 0);
@@ -184,8 +343,6 @@ void masterUpdateTask() {
     pros::delay(5);
   }
 }
-
-pros::Task masterTask(masterUpdateTask);
 
 void updateTempArc(lv_timer_t *timer) {
   for (int i = 0; i < 9; i++) {
@@ -439,9 +596,59 @@ void uiScreenloader(lv_event_t *e) {
 }
 
 void loadDiagScreen(lv_event_t *e) {
+  pros::Task masterTask(masterUpdateTask);
   createNavBar(diagScreen);
   currentScreen = UI;
   lv_screen_load_anim(diagScreen, LV_SCR_LOAD_ANIM_MOVE_TOP, loadtime, 250,
+                      false);
+}
+
+void loadTurnPID(lv_event_t *e) {
+  lv_obj_t *kp =
+      createLVGLText(turnPIDScreen, nullptr, LV_ALIGN_CENTER, 0, -30);
+  lv_obj_t *ki = createLVGLText(turnPIDScreen, nullptr, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_t *kd = createLVGLText(turnPIDScreen, nullptr, LV_ALIGN_CENTER, 0, 30);
+  static pros::Task tunerTask(turnPIDTunerTask);
+  lv_timer_create(updatePIDText, 100, NULL);
+
+  lv_screen_load_anim(turnPIDScreen, LV_SCR_LOAD_ANIM_FADE_IN, loadtime, 100,
+                      false);
+}
+
+void loadLatPID(lv_event_t *e) {
+  lv_obj_t *kp = createLVGLText(latPIDScreen, nullptr, LV_ALIGN_CENTER, 0, -30);
+  lv_obj_t *ki = createLVGLText(latPIDScreen, nullptr, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_t *kd = createLVGLText(latPIDScreen, nullptr, LV_ALIGN_CENTER, 0, 30);
+
+  char buf[32];
+  snprintf(buf, sizeof(buf), "kp: %.5f", l_kp);
+  lv_label_set_text(kp, buf);
+  snprintf(buf, sizeof(buf), "ki: %.5f", l_ki);
+  lv_label_set_text(ki, buf);
+  snprintf(buf, sizeof(buf), "kd: %.5f", l_kd);
+  lv_label_set_text(kd, buf);
+
+  lv_screen_load_anim(latPIDScreen, LV_SCR_LOAD_ANIM_FADE_IN, loadtime, 100,
+                      false);
+}
+
+void loadAutoPIDScreen(lv_event_t *e) {
+  t_kp = angular_controller.kP;
+  t_ki = angular_controller.kI;
+  t_kd = angular_controller.kD;
+  l_kp = lateral_controller.kP;
+  l_ki = lateral_controller.kI;
+  l_kd = lateral_controller.kD;
+
+  lv_obj_t *title =
+      createLVGLText(autoPIDButton, "Auto PID Tuner", LV_ALIGN_TOP_MID, 0, 5);
+
+  turnPIDButton = createLvglButton(autoPIDScreen, "Turn", loadTurnPID, 85, 75,
+                                   LV_ALIGN_CENTER, -50, 5);
+  latPIDButton = createLvglButton(autoPIDScreen, "Lateral", loadLatPID, 85, 75,
+                                  LV_ALIGN_CENTER, 50, 5);
+
+  lv_screen_load_anim(autoPIDScreen, LV_SCR_LOAD_ANIM_MOVE_TOP, loadtime, 100,
                       false);
 }
 
@@ -479,6 +686,9 @@ void screeninit() {
   headingScreen = lv_obj_create(NULL);
   positionScreen = lv_obj_create(NULL);
   tempScreen = lv_obj_create(NULL);
+  autoPIDScreen = lv_obj_create(NULL);
+  turnPIDScreen = lv_obj_create(NULL);
+  latPIDScreen = lv_obj_create(NULL);
   torqueScreen = lv_obj_create(NULL);
   currentScreen = UI;
 
@@ -491,6 +701,9 @@ void screeninit() {
   lv_obj_t *autonButton =
       createLvglButton(uiScreen, "Auton", loadAutonScreen, 105, 60,
                        LV_ALIGN_RIGHT_MID, -105, -10, LV_PALETTE_PURPLE);
+
+  autoPIDButton = createLvglButton(uiScreen, "AUTO PID", loadAutoPIDScreen, 200,
+                                   60, LV_ALIGN_BOTTOM_MID, 0, -8);
 
   lv_obj_t *diagButton =
       createLvglButton(uiScreen, "Diagnostics", loadDiagScreen, 105, 60,

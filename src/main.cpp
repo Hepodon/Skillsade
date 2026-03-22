@@ -20,8 +20,6 @@ using namespace pros;
 using namespace std;
 
 void odom() {
-  if (!mcl_initialized)
-    return;
 
   auto pose = chassis.getPose();
 
