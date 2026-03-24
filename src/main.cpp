@@ -1,5 +1,6 @@
 #include "main.h"
 #include "controls.hpp"
+#include "graphics.hpp"
 #include "liblvgl/display/lv_display.h"
 #include "liblvgl/lvgl.h"
 #include "liblvgl/widgets/line/lv_line.h"
@@ -15,10 +16,6 @@ ad::Point last_odom_pos{0.0f, 0.0f};
 bool mcl_initialized = false;
 
 using namespace pros;
-
-enum auton { Left, Right, rSolo, skills };
-
-auton selected;
 
 void createLvglButton(lv_obj_t *button, const char *text,
                       lv_event_cb_t event_cb, int width, int height,
@@ -113,58 +110,14 @@ void initialize() {
   chassis.calibrate(false);
   chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
   lvgl_init();
+  screeninit();
 }
-
-struct Chartseries {
-  lv_obj_t *chart;
-  lv_chart_series_t *headingSeries;
-};
-
-Chartseries hey;
-
-lv_obj_t *createLVGLChart(Chartseries &stru) {
-  lv_obj_t *chart = lv_chart_create(lv_screen_active());
-  lv_chart_series_t *headingSeries;
-
-  lv_chart_set_type(chart, LV_CHART_TYPE_LINE);
-
-  lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, -180, 180);
-
-  lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_SHIFT);
-
-  lv_chart_set_point_count(chart, 100);
-
-  headingSeries = lv_chart_add_series(chart, lv_palette_main(LV_PALETTE_RED),
-                                      LV_CHART_AXIS_PRIMARY_Y);
-
-  lv_obj_set_size(chart, 400, 200);
-  lv_obj_align(chart, LV_ALIGN_CENTER, 0, 0);
-  stru = {chart, headingSeries};
-
-  return chart;
-}
-void updateChart() {
-  double head;
-  while (true) {
-    head = inertial1.get_heading();
-    if (head > 180)
-      head -= 360;
-    lv_chart_set_next_value(hey.chart, hey.headingSeries, head);
-    lv_chart_refresh(hey.chart);
-    pros::delay(100);
-  }
-}
-void screenshot(pros::Task task) { pros::Task suspend(task); }
 
 void disabled() {}
 
 void competition_initialize() { chassis.calibrate(); }
 
-void autonomous() {
-  Task chartTask(updateChart);
-  chassis.turnToHeading(90, 1000);
-  screenshot(chartTask);
-}
+void autonomous() {}
 
 void opcontrol() {
   int leftY;

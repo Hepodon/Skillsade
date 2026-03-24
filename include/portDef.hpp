@@ -3,7 +3,7 @@
 #include "lemlib/chassis/trackingWheel.hpp"
 #include "main.h"
 
-extern float motorPorts;
+extern float motorPorts[8][3];
 
 extern pros::MotorGroup aleft;
 extern pros::MotorGroup aright;
