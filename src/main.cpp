@@ -2,10 +2,11 @@
 #include "controls.hpp"
 #include "graphics.hpp"
 #include "liblvgl/display/lv_display.h"
-#include "liblvgl/lvgl.h"
-#include "liblvgl/widgets/line/lv_line.h"
+#include "liblvgl/misc/lv_event.h"
+#include "liblvgl/misc/lv_types.h"
 #include "mcl.hpp"
 #include "portDef.hpp"
+#include "pros/motors.h"
 #include "pros/screen.hpp"
 #include <cmath>
 #include <cstdio>
@@ -16,34 +17,9 @@ ad::Point last_odom_pos{0.0f, 0.0f};
 bool mcl_initialized = false;
 
 using namespace pros;
-
-void createLvglButton(lv_obj_t *button, const char *text,
-                      lv_event_cb_t event_cb, int width, int height,
-                      lv_obj_t *base, lv_align_t align, int x_ofs, int y_ofs,
-                      lv_palette_t color = LV_PALETTE_BLUE) {
-  lv_obj_set_size(button, width, height);
-  lv_obj_align_to(button, base, align, x_ofs, y_ofs);
-  lv_obj_set_style_radius(button, 20, 0);
-  lv_obj_set_style_bg_color(button, lv_palette_main(color), LV_STATE_DEFAULT);
-  lv_obj_set_style_bg_color(button, lv_palette_darken(color, 3),
-                            LV_STATE_PRESSED);
-
-  lv_obj_t *label = lv_label_create(button);
-  lv_label_set_text(label, text);
-  lv_obj_align_to(label, button, LV_ALIGN_CENTER, 0, 0);
-
-  lv_obj_add_event_cb(button, event_cb, LV_EVENT_RELEASED, NULL);
-
-  lv_obj_set_scrollbar_mode(button, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_set_scrollbar_mode(label, LV_SCROLLBAR_MODE_OFF);
-
-  // lv_obj_set_style_bg_opa(button, LV_OPA_TRANSP, 0);
-  // lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, 0);
-}
+using namespace std;
 
 void odom() {
-  if (!mcl_initialized)
-    return;
 
   auto pose = chassis.getPose();
 
@@ -106,16 +82,22 @@ void odom() {
 //   //   }
 // });
 
+enum auton { Left, Right, rSolo, lSolo, skills };
+
+auton selected;
+
 void initialize() {
-  chassis.calibrate(false);
-  chassis.setBrakeMode(E_MOTOR_BRAKE_COAST);
+  chassis.calibrate(true);
   lvgl_init();
   screeninit();
 }
 
 void disabled() {}
 
-void competition_initialize() { chassis.calibrate(); }
+void competition_initialize() {
+  chassis.calibrate(true);
+  Task averagingTask(avgIMU);
+}
 
 void autonomous() {}
 
@@ -132,6 +114,9 @@ void opcontrol() {
 
     applyButtons(userInput);
 
+    for (int i = 0; i < 9; i++) {
+      pros::c::motor_move(motorPorts[i][0], 127);
+    }
     // Apply controller input for movement using split arcade controls
     chassis.arcade(leftY, rightX, true, 0.40);
 
