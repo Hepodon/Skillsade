@@ -96,7 +96,6 @@ void disabled() {}
 
 void competition_initialize() {
   chassis.calibrate(true);
-  Task averagingTask(avgIMU);
 }
 
 void autonomous() {}
@@ -114,9 +113,6 @@ void opcontrol() {
 
     applyButtons(userInput);
 
-    for (int i = 0; i < 9; i++) {
-      pros::c::motor_move(motorPorts[i][0], 127);
-    }
     // Apply controller input for movement using split arcade controls
     chassis.arcade(leftY, rightX, true, 0.40);
 

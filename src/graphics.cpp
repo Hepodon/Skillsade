@@ -159,8 +159,7 @@ void turnPIDTunerTask(void *) {
   tuningActive = true;
 
   while (tuningActive) {
-
-    float target = 15 + (rand() % 165);
+    float target = 15 + rand() % 180;
 
     float maxError = 0;
     float lastError = 0;
@@ -209,7 +208,7 @@ void turnPIDTunerTask(void *) {
 
       lastError = absError;
 
-      if ((pros::millis() - startTime > 2000) || settled) {
+      if ((pros::millis() - startTime > 2000) && settled) {
         break;
       }
 
@@ -357,14 +356,14 @@ void masterUpdateTask() {
 }
 
 void updateTempArc(lv_timer_t *timer) {
-  for (int i = 0; i < 9; i++) {
+  for (int i = 0; i < motorCount; i++) {
     int val = motorPorts[i][1];
     lv_arc_set_value(tempArcs[i], val);
     update_arc_color(tempArcs[i], val, lv_arc_get_max_value(tempArcs[i]));
   }
 }
 void updateTorqueArc(lv_timer_t *timer) {
-  for (int i = 0; i < 9; i++) {
+  for (int i = 0; i < motorCount; i++) {
     int val = motorPorts[i][2];
     lv_arc_set_value(torqueArcs[i], val);
     update_arc_color(torqueArcs[i], val, lv_arc_get_max_value(torqueArcs[i]));
@@ -379,9 +378,9 @@ void createTempArcs() {
 
     lv_obj_set_size(tempArcs[i], 90, 90);
 
-    lv_arc_set_range(tempArcs[i], 20, 62);
-
     lv_arc_set_rotation(tempArcs[i], 180);
+
+    lv_arc_set_range(tempArcs[i], 20, 62);
 
     lv_arc_set_bg_angles(tempArcs[i], 30, 150);
 
@@ -398,9 +397,9 @@ void createTempArcs() {
 
     if (i < 6) {
       position = "CHASSIS";
-    } else if (i == 7) {
+    } else if (i == 6) {
       position = "L-MIDDLE";
-    } else if (i == 8) {
+    } else if (i == 7) {
       position = "R-MIDDLE";
     }
 
@@ -428,9 +427,9 @@ void createTorqueArcs() {
 
     lv_obj_set_size(torqueArcs[i], 90, 90);
 
-    lv_arc_set_range(torqueArcs[i], 0, 100);
-
     lv_arc_set_rotation(torqueArcs[i], 180);
+
+    lv_arc_set_range(torqueArcs[i], 0, 100);
 
     lv_arc_set_bg_angles(torqueArcs[i], 30, 150);
 
@@ -446,13 +445,10 @@ void createTorqueArcs() {
     if (i < 6) {
       position = "CHASSIS";
     } else if (i == 6) {
-      position = "INTAKE";
+      position = "L-MIDDLE";
     } else if (i == 7) {
-      position = "HOOD";
-    } else if (i == 8) {
-      position = "MIDDLE";
+      position = "R-MIDDLE";
     }
-
     if (i < 5) {
       lv_obj_align(torqueArcs[i], LV_ALIGN_BOTTOM_LEFT, 4 + (96 * i),
                    -(242 / 2) + 15);
@@ -484,7 +480,6 @@ void loadTempScreen(lv_event_t *e) {
 
   if (tempTimer == nullptr) {
     tempTimer = lv_timer_create(updateTempArc, 100, NULL);
-  } else {
     lv_timer_resume(tempTimer);
   }
 
