@@ -4,6 +4,7 @@
 #include "liblvgl/display/lv_display.h"
 #include "liblvgl/misc/lv_event.h"
 #include "liblvgl/misc/lv_types.h"
+#include "lvgl_Customs.hpp"
 #include "mcl.hpp"
 #include "portDef.hpp"
 #include "pros/motors.h"
@@ -94,11 +95,9 @@ void initialize() {
 
 void disabled() {}
 
-void competition_initialize() {
-  chassis.calibrate(true);
-}
+void competition_initialize() { chassis.calibrate(true); }
 
-void autonomous() {}
+void autonomous() {  }
 
 void opcontrol() {
   int leftY;

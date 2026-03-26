@@ -8,3 +8,5 @@
 extern void screeninit();
 extern void updateChart();
 extern void screenshot(pros::Task task);
+
+extern void loadLatPID(lv_event_t *e);

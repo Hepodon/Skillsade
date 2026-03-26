@@ -208,7 +208,7 @@ void turnPIDTunerTask(void *) {
 
       lastError = absError;
 
-      if ((pros::millis() - startTime > 2000) && settled) {
+      if ((pros::millis() - startTime > 2000) || settled) {
         break;
       }
 
