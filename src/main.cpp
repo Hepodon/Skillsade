@@ -77,10 +77,10 @@ void odom() {
 }
 
 // Task odomTask([] {
-//   //   while (true) {
-//   //     odom();
-//   //     delay(10); // 100Hz
-//   //   }
+//   while (true) {
+//     odom();
+//     delay(10);
+//   }
 // });
 
 enum auton { Left, Right, rSolo, lSolo, skills };
@@ -112,7 +112,7 @@ void opcontrol() {
     applyButtons(userInput);
 
     // Apply controller input for movement using split arcade controls
-    chassis.arcade(leftY, rightX, true, 0.40);
+    chassis.arcade(leftY, rightX, false, 0.40);
 
     delay(10);
   }

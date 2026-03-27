@@ -1,5 +1,6 @@
 #include "lemlib/chassis/chassis.hpp"
 #include "lemlib/chassis/trackingWheel.hpp"
+#include "lemlib/exitcondition.hpp"
 #include "main.h"
 
 using namespace pros;
@@ -68,5 +69,8 @@ lemlib::ControllerSettings
                        0     // maximum acceleration (slew)
     );
 
-lemlib::Chassis chassis(DT, lateral_controller, angular_controller, sensors);
+lemlib::ExpoDriveCurve driveCurve(3, 15, 1.015);
+
+lemlib::Chassis chassis(DT, lateral_controller, angular_controller, sensors,
+                        &driveCurve, &driveCurve);
 Controller userInput(E_CONTROLLER_MASTER);
