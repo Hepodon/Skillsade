@@ -14,6 +14,7 @@
 #include "liblvgl/misc/lv_timer.h"
 #include "liblvgl/widgets/arc/lv_arc.h"
 #include "liblvgl/widgets/chart/lv_chart.h"
+#include "liblvgl/widgets/label/lv_label.h"
 #include "lvgl_Customs.hpp"
 #include "main.h"
 #include "portDef.hpp"
@@ -155,18 +156,22 @@ int stagnantRuns = 0;
 int goodRuns = 0;
 int totalRuns;
 
+int settleStart = -1;
+int zeroCrossings = 0;
+
 void turnPIDTunerTask(void *) {
   tuningActive = true;
 
   while (tuningActive) {
-    float target = 15 + rand() % 180;
+    float target = 90 + rand() % 90;
+
+    chassis.setPose(0, 0, 0);
 
     float maxError = 0;
     float lastError = 0;
     float steadyStateError = 0;
-    int zeroCrossings = 0;
     int settleTime = 0;
-
+    zeroCrossings = 0;
     bool settled = false;
     bool first = true;
     bool lastSign = false;
@@ -176,7 +181,8 @@ void turnPIDTunerTask(void *) {
     int startTime = pros::millis();
 
     while (true) {
-      float current = inertial1.get_heading();
+      
+      float current = chassis.getPose().theta;
       float error = wrapError(target, current);
       float absError = fabs(error);
 
@@ -184,14 +190,18 @@ void turnPIDTunerTask(void *) {
         maxError = absError;
       }
 
-      bool sign = error > 0;
-      if (!first && sign != lastSign) {
-        zeroCrossings++;
-      }
-      lastSign = sign;
-      first = false;
+      float deadband = 1.0;
 
-      int settleStart = -1;
+      if (fabs(error) > deadband) {
+        bool sign = error > 0;
+
+        if (!first && sign != lastSign) {
+          zeroCrossings++;
+        }
+
+        lastSign = sign;
+        first = false;
+      }
 
       if (absError < 1.0) {
         if (settleStart == -1) {
@@ -208,7 +218,7 @@ void turnPIDTunerTask(void *) {
 
       lastError = absError;
 
-      if ((pros::millis() - startTime > 2000) || settled) {
+      if (pros::millis() - startTime > 2000 || settled) {
         break;
       }
 
@@ -224,8 +234,14 @@ void turnPIDTunerTask(void *) {
       angular_controller.kP *= 0.9;
     }
 
-    if (zeroCrossings > 4) {
-      float factor = std::clamp(zeroCrossings / 4.0f, 1.1f, 1.5f);
+    if (maxError > 2) {
+      angular_controller.kD *=
+          std::clamp(static_cast<float>(maxError), 1.1f, 1.5f);
+    }
+
+    if (zeroCrossings >= 2) {
+      float factor =
+          std::clamp(static_cast<float>(zeroCrossings) / 2, 1.1f, 1.5f);
       angular_controller.kD *= factor;
     } else if (zeroCrossings == 0 && maxError < 10) {
       angular_controller.kD *= 0.95;
@@ -236,7 +252,7 @@ void turnPIDTunerTask(void *) {
     }
 
     angular_controller.kP = std::clamp(angular_controller.kP, 0.1f, 20.0f);
-    angular_controller.kD = std::clamp(angular_controller.kD, 0.0f, 10.0f);
+    angular_controller.kD = std::clamp(angular_controller.kD, 0.0f, 50.0f);
 
     t_kp = angular_controller.kP;
     t_kd = angular_controller.kD;
@@ -275,11 +291,15 @@ void turnPIDTunerTask(void *) {
   }
 }
 
+lv_obj_t *ZC = nullptr;
+
 void updatePIDTextp(lv_timer_t *timer) {
   char buf[32];
 
   snprintf(buf, sizeof(buf), "kp: %.5f", t_kp);
   lv_label_set_text((lv_obj_t *)timer->user_data, buf);
+
+  lv_label_set_text_fmt(ZC, "ZC: %d", zeroCrossings);
 }
 
 void updatePIDTexti(lv_timer_t *timer) {
@@ -613,6 +633,7 @@ void loadTurnPID(lv_event_t *e) {
       createLVGLText(turnPIDScreen, nullptr, LV_ALIGN_CENTER, 0, -30);
   lv_obj_t *ki = createLVGLText(turnPIDScreen, nullptr, LV_ALIGN_CENTER, 0, 0);
   lv_obj_t *kd = createLVGLText(turnPIDScreen, nullptr, LV_ALIGN_CENTER, 0, 30);
+  ZC = createLVGLText(turnPIDScreen, "ZC: ", LV_ALIGN_CENTER, 0, -60);
   static pros::Task tunerTask(turnPIDTunerTask);
   lv_timer_create(updatePIDTextp, 100, kp);
   lv_timer_create(updatePIDTexti, 100, ki);
