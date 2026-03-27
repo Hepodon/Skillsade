@@ -113,7 +113,7 @@ void opcontrol() {
     applyButtons(userInput);
 
     // Apply controller input for movement using split arcade controls
-    chassis.arcade(leftY, rightX, true, 0.40);
+    chassis.arcade(leftY, rightX, false, 0.40);
 
     delay(10);
   }
