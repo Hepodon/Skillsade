@@ -77,10 +77,10 @@ void odom() {
 }
 
 // Task odomTask([] {
-//   //   while (true) {
-//   //     odom();
-//   //     delay(10); // 100Hz
-//   //   }
+//   while (true) {
+//     odom();
+//     delay(10);
+//   }
 // });
 
 enum auton { Left, Right, rSolo, lSolo, skills };
