@@ -1,5 +1,6 @@
 #include "lemlib/chassis/chassis.hpp"
 #include "lemlib/chassis/trackingWheel.hpp"
+#include "lemlib/exitcondition.hpp"
 #include "main.h"
 
 using namespace pros;
@@ -57,16 +58,18 @@ lemlib::ControllerSettings
 
 // angular PID controller
 lemlib::ControllerSettings
-    angular_controller(4.45, // proportional gain (kP)
-                       0,    // integral gain (kI)
+    angular_controller(4.45,    // proportional gain (kP)
+                       0,       // integral gain (kI)
                        1.28512, // derivative gain (kD)
-                       3,    // anti windup
-                       1,    // small error range, in degrees
-                       100,  // small error range timeout, in milliseconds
-                       3,    // large error range, in degrees
-                       500,  // large error range timeout, in milliseconds
-                       0     // maximum acceleration (slew)
+                       3,       // anti windup
+                       1,       // small error range, in degrees
+                       100,     // small error range timeout, in milliseconds
+                       3,       // large error range, in degrees
+                       500,     // large error range timeout, in milliseconds
+                       0        // maximum acceleration (slew)
     );
+lemlib::ExpoDriveCurve driveCurve(3, 15, 1.015);
 
-lemlib::Chassis chassis(DT, lateral_controller, angular_controller, sensors);
+lemlib::Chassis chassis(DT, lateral_controller, angular_controller, sensors,
+                        &driveCurve, &driveCurve);
 Controller userInput(E_CONTROLLER_MASTER);

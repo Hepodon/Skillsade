@@ -97,7 +97,7 @@ void disabled() {}
 
 void competition_initialize() { chassis.calibrate(true); }
 
-void autonomous() {  }
+void autonomous() {}
 
 void opcontrol() {
   int leftY;
